@@ -1,0 +1,36 @@
+# Build artifacts
+android/app/build/
+ios/build/
+ios/Pods/
+build/
+dist/
+
+# Dependencies
+node_modules/
+.gradle/
+
+# React Native bundler outputs
+.bundle/
+*.jsbundle
+
+# Logs and reports
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+*.log
+
+# Metro, TypeScript, and cache directories
+.expo
+.expo-shared/
+.turbo/
+.parcel-cache/
+.jest/
+coverage/
+*.tsbuildinfo
+
+# OS / editor detritus
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
