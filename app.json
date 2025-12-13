@@ -1,0 +1,25 @@
+{
+  "expo": {
+    "name": "venso",
+    "slug": "venso",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "resizeMode": "contain",
+      "backgroundColor": "#101828"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "package": "com.venso.booking"
+    },
+    "web": {
+      "bundler": "metro"
+    }
+  }
+}
