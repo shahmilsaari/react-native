@@ -27,6 +27,43 @@ const LoginScreen = () => {
   const setError = useAuthStore((state) => state.setError);
   const setSession = useAuthStore((state) => state.setSession);
 
+  const getFriendlyErrorMessage = (rawError: any) => {
+    const fallback = 'Unable to sign in. Please try again.';
+
+    const message = rawError?.message;
+    if (typeof message === 'string') {
+      const trimmed = message.trim();
+      if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+        try {
+          const parsed = JSON.parse(trimmed);
+          const issueMessage =
+            parsed?.[0]?.message ??
+            parsed?.issues?.[0]?.message ??
+            parsed?.message ??
+            parsed?.error?.message;
+          if (typeof issueMessage === 'string' && issueMessage.trim()) {
+            return issueMessage;
+          }
+        } catch {
+          // ignore JSON parse errors
+        }
+      }
+
+      if (trimmed) {
+        return trimmed;
+      }
+    }
+
+    const zodIssue =
+      rawError?.data?.zodError?.issues?.[0]?.message ??
+      rawError?.shape?.data?.zodError?.issues?.[0]?.message;
+    if (typeof zodIssue === 'string' && zodIssue.trim()) {
+      return zodIssue;
+    }
+
+    return fallback;
+  };
+
   const mutation = trpc.auth.login.useMutation({
     onMutate: () => {
       setError(undefined);
@@ -41,7 +78,7 @@ const LoginScreen = () => {
       setSession(payload as AuthLoginOutput);
     },
     onError: (error: any) => {
-      setError(error?.message ?? 'Unable to sign in. Please try again.');
+      setError(getFriendlyErrorMessage(error));
     }
   });
 
