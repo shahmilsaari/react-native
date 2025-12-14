@@ -6,6 +6,7 @@ import { useAuthStore } from '@/store/authStore';
 import LoginScreen from '@/screens/LoginScreen';
 import PackageDetailsScreen from '@/screens/PackageDetailsScreen';
 import PackagesScreen from '@/screens/PackagesScreen';
+import ProfileScreen from '@/screens/ProfileScreen';
 import palette from '@/theme/colors';
 import { RootStackParamList } from './types';
 
@@ -29,7 +30,8 @@ const AppNavigator = () => {
       <Stack.Navigator screenOptions={{ headerShadowVisible: false }}>
         {isAuthenticated ? (
           <>
-            <Stack.Screen name="Packages" component={PackagesScreen} options={{ title: 'Venso Packages' }} />
+            <Stack.Screen name="Packages" component={PackagesScreen} options={{ headerShown: false }} />
+            <Stack.Screen name="Profile" component={ProfileScreen} options={{ headerShown: false }} />
             <Stack.Screen
               name="PackageDetails"
               component={PackageDetailsScreen}

@@ -1,4 +1,4 @@
-import React, { useLayoutEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -40,19 +40,32 @@ const PackagesScreen = ({ navigation }: Props) => {
   const packages = usePackagesStore((state) => state.packages);
   const refreshPackages = usePackagesStore((state) => state.refreshPackages);
   const logout = useAuthStore((state) => state.logout);
+  const user = useAuthStore((state) => state.user);
   const [query, setQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<'all' | PackageCategory>('all');
   const [refreshing, setRefreshing] = useState(false);
+  const [searchExpanded, setSearchExpanded] = useState(false);
+  const searchInputRef = useRef<TextInput>(null);
 
-  useLayoutEffect(() => {
-    navigation.setOptions({
-      headerRight: () => (
-        <Pressable onPress={logout}>
-          <Text style={styles.logout}>Logout</Text>
-        </Pressable>
-      )
-    });
-  }, [logout, navigation]);
+  useEffect(() => {
+    if (searchExpanded) {
+      requestAnimationFrame(() => searchInputRef.current?.focus());
+    }
+  }, [searchExpanded]);
+
+  const greeting = useMemo(() => {
+    const hour = new Date().getHours();
+    if (hour < 12) return 'Good morning';
+    if (hour < 18) return 'Good afternoon';
+    return 'Good evening';
+  }, []);
+
+  const displayName = useMemo(() => {
+    if (user?.firstName || user?.lastName) {
+      return `${user?.firstName ?? ''} ${user?.lastName ?? ''}`.trim();
+    }
+    return user?.email ?? 'Guest';
+  }, [user?.email, user?.firstName, user?.lastName]);
 
   const filteredPackages = useMemo(() => {
     const normalized = query.toLowerCase();
@@ -74,35 +87,56 @@ const PackagesScreen = ({ navigation }: Props) => {
 
   const renderHeader = () => (
     <View style={styles.hero}>
-      <View style={styles.heroRow}>
+      <View style={styles.topBar}>
         <View>
-          <Text style={styles.greeting}>Good morning</Text>
-          <Text style={styles.profileName}>Delisas UX/UI & SaaS</Text>
+          <Text style={styles.greeting}>{greeting}</Text>
+          <Text style={styles.profileName} numberOfLines={1}>
+            {displayName}
+          </Text>
         </View>
-        <View style={styles.heroActions}>
-          <Pressable style={styles.circleButton}>
-            <Feather name="bell" size={18} color={palette.primary} />
-          </Pressable>
-          <Pressable style={styles.circleButton}>
-            <Feather name="sliders" size={18} color={palette.primary} />
+        <View style={styles.topBarActions}>
+          {searchExpanded ? (
+            <Pressable
+              style={styles.iconButton}
+              onPress={() => {
+                setSearchExpanded(false);
+                setQuery('');
+              }}
+            >
+              <Feather name="x" size={20} color={palette.primary} />
+            </Pressable>
+          ) : (
+            <Pressable style={styles.iconButton} onPress={() => setSearchExpanded(true)}>
+              <Feather name="search" size={18} color={palette.primary} />
+            </Pressable>
+          )}
+          <Pressable style={styles.iconButton} onPress={logout}>
+            <Feather name="menu" size={20} color={palette.primary} />
           </Pressable>
         </View>
       </View>
-      <Text style={styles.heroSubtitle}>Stay on-brand even when you travel. Curated villas, lofts, and suites.</Text>
 
-      <View style={styles.searchField}>
-        <Feather name="search" color={palette.muted} size={18} />
-        <TextInput
-          placeholder="Search cities, hotels, experiences"
-          placeholderTextColor={palette.muted}
-          style={styles.searchInput}
-          value={query}
-          onChangeText={setQuery}
-        />
-        <Pressable style={styles.filterButton}>
-          <Feather name="more-horizontal" color={palette.surface} size={18} />
-        </Pressable>
-      </View>
+      {searchExpanded ? (
+        <View style={styles.searchField}>
+          <Feather name="search" size={18} color={palette.muted} />
+          <TextInput
+            ref={searchInputRef}
+            placeholder="Search cities, stays, experiences"
+            placeholderTextColor={palette.muted}
+            style={styles.searchInput}
+            value={query}
+            onChangeText={setQuery}
+            autoCapitalize="none"
+            autoCorrect={false}
+            returnKeyType="search"
+          />
+          {query.length ? (
+            <Pressable onPress={() => setQuery('')} hitSlop={10}>
+              <Feather name="x-circle" size={18} color={palette.muted} />
+            </Pressable>
+          ) : null}
+        </View>
+      ) : null}
 
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categories}>
         {categoryFilters.map((filter) => {
@@ -143,7 +177,15 @@ const PackagesScreen = ({ navigation }: Props) => {
         {navItems.map((item, index) => {
           const isActive = index === 0;
           return (
-            <Pressable key={item.label} style={[styles.navButton, isActive && styles.navButtonActive]}>
+            <Pressable
+              key={item.label}
+              style={[styles.navButton, isActive && styles.navButtonActive]}
+              onPress={() => {
+                if (item.label === 'Profile') {
+                  navigation.navigate('Profile');
+                }
+              }}
+            >
               <Feather
                 name={item.icon}
                 size={20}
@@ -172,7 +214,7 @@ const styles = StyleSheet.create({
     paddingBottom: 12,
     gap: 18
   },
-  heroRow: {
+  topBar: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center'
@@ -187,19 +229,14 @@ const styles = StyleSheet.create({
     color: palette.primary,
     marginTop: 4
   },
-  heroSubtitle: {
-    color: palette.muted,
-    fontSize: 15,
-    lineHeight: 22
-  },
-  heroActions: {
+  topBarActions: {
     flexDirection: 'row',
     gap: 12
   },
-  circleButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+  iconButton: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
     borderWidth: 1,
     borderColor: palette.border,
     alignItems: 'center',
@@ -207,28 +244,21 @@ const styles = StyleSheet.create({
     backgroundColor: palette.surface
   },
   searchField: {
+    marginTop: 14,
     flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: 22,
+    gap: 10,
+    borderRadius: 18,
     backgroundColor: palette.surface,
-    paddingHorizontal: 16,
+    paddingHorizontal: 14,
     borderWidth: 1,
     borderColor: palette.border,
-    height: 56
+    height: 54
   },
   searchInput: {
     flex: 1,
-    paddingHorizontal: 10,
     color: palette.text,
     fontSize: 15
-  },
-  filterButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    backgroundColor: palette.primary,
-    alignItems: 'center',
-    justifyContent: 'center'
   },
   categories: {
     gap: 12,
@@ -254,10 +284,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     color: palette.muted,
     marginTop: 40
-  },
-  logout: {
-    color: palette.secondary,
-    fontWeight: '600'
   },
   bottomNav: {
     position: 'absolute',

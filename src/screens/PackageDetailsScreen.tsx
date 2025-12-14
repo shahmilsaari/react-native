@@ -92,10 +92,20 @@ const PackageDetailsScreen = ({ route, navigation }: Props) => {
               </ImageBackground>
             )}
           />
-          <View style={styles.dots}>
-            {gallery.map((_, index) => (
-              <View key={index} style={[styles.dot, index === activeSlide && styles.activeDot]} />
-            ))}
+          <View style={styles.sliderFooter}>
+            <View style={styles.dots}>
+              {gallery.map((_, index) => (
+                <View key={index} style={[styles.dot, index === activeSlide && styles.activeDot]} />
+              ))}
+            </View>
+            <View style={styles.sliderIndicator}>
+              <View style={styles.sliderCounter}>
+                <Text style={styles.sliderCounterText}>{activeSlide + 1}</Text>
+                <Text style={styles.sliderCounterDivider}>/</Text>
+                <Text style={styles.sliderCounterText}>{gallery.length}</Text>
+              </View>
+              <Text style={styles.sliderIndicatorHint}>Swipe to view more</Text>
+            </View>
           </View>
         </View>
 
@@ -212,6 +222,40 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 8,
     marginBottom: 16
+  },
+  sliderFooter: {
+    gap: 8,
+    alignItems: 'center',
+    marginBottom: 16
+  },
+  sliderIndicator: {
+    alignItems: 'center',
+    gap: 4
+  },
+  sliderCounter: {
+    flexDirection: 'row',
+    backgroundColor: 'rgba(0,0,0,0.65)',
+    paddingVertical: 6,
+    paddingHorizontal: 18,
+    borderRadius: 999,
+    alignItems: 'center',
+    gap: 6
+  },
+  sliderCounterText: {
+    color: '#fff',
+    fontWeight: '600',
+    fontSize: 12
+  },
+  sliderCounterDivider: {
+    color: '#fff',
+    fontSize: 12,
+    opacity: 0.7
+  },
+  sliderIndicatorHint: {
+    color: 'rgba(255,255,255,0.85)',
+    fontSize: 11,
+    textTransform: 'uppercase',
+    letterSpacing: 0.8
   },
   dot: {
     width: 8,
