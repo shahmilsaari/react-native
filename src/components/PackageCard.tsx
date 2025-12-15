@@ -4,6 +4,7 @@ import { Feather } from '@expo/vector-icons';
 
 import palette from '@/theme/colors';
 import { TravelPackage } from '@/types';
+import { formatCurrency } from '@/utils/formatCurrency';
 
 type Props = {
   data: TravelPackage;
@@ -31,7 +32,7 @@ const PackageCard = ({ data, onPress }: Props) => {
           </View>
           <Text style={styles.name}>{data.name}</Text>
           <Text style={styles.priceLine}>
-            <Text style={styles.priceValue}>${data.price}</Text>
+            <Text style={styles.priceValue}>{formatCurrency(data.price)}</Text>
             <Text style={styles.priceSuffix}> /package</Text>
           </Text>
           <View style={styles.metaRow}>

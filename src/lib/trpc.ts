@@ -37,6 +37,7 @@ const fetchWithTimeout: typeof fetch = async (input, init) => {
 export const createTrpcClient = () => {
   const trpcUrl = getTrpcUrl();
   const shouldDebug = truthy(process.env.EXPO_PUBLIC_TRPC_DEBUG);
+  const shouldLogServices = truthy(process.env.EXPO_PUBLIC_TRPC_LOG_SERVICES);
 
   if (shouldDebug) {
     console.log('[tRPC] url', trpcUrl);
@@ -47,6 +48,9 @@ export const createTrpcClient = () => {
       httpBatchLink({
         url: trpcUrl,
         fetch: async (url, options) => {
+          if (shouldLogServices && typeof url === 'string' && url.includes('/services.')) {
+            console.log('[tRPC] services endpoint', options?.method ?? 'GET', url);
+          }
           if (!shouldDebug) {
             return fetchWithTimeout(url, options);
           }

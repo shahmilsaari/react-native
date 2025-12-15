@@ -9,9 +9,11 @@ import {
   KeyboardAvoidingView,
   Platform,
   TouchableWithoutFeedback,
-  Keyboard
+  Keyboard,
+  ImageBackground,
+  StatusBar
 } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Feather, FontAwesome5 } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { trpc } from '@/lib/trpc';
@@ -27,9 +29,9 @@ const LoginScreen = () => {
   const setError = useAuthStore((state) => state.setError);
   const setSession = useAuthStore((state) => state.setSession);
 
+  // Friendly error logic kept same
   const getFriendlyErrorMessage = (rawError: any) => {
     const fallback = 'Unable to sign in. Please try again.';
-
     const message = rawError?.message;
     if (typeof message === 'string') {
       const trimmed = message.trim();
@@ -44,23 +46,10 @@ const LoginScreen = () => {
           if (typeof issueMessage === 'string' && issueMessage.trim()) {
             return issueMessage;
           }
-        } catch {
-          // ignore JSON parse errors
-        }
+        } catch { }
       }
-
-      if (trimmed) {
-        return trimmed;
-      }
+      if (trimmed) return trimmed;
     }
-
-    const zodIssue =
-      rawError?.data?.zodError?.issues?.[0]?.message ??
-      rawError?.shape?.data?.zodError?.issues?.[0]?.message;
-    if (typeof zodIssue === 'string' && zodIssue.trim()) {
-      return zodIssue;
-    }
-
     return fallback;
   };
 
@@ -74,7 +63,6 @@ const LoginScreen = () => {
         setError('Login response was invalid.');
         return;
       }
-
       setSession(payload as AuthLoginOutput);
     },
     onError: (error: any) => {
@@ -90,304 +78,256 @@ const LoginScreen = () => {
       setError('Email and password are required.');
       return;
     }
-
     mutation.mutate({ email: email.trim(), password });
   };
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
-      <KeyboardAvoidingView style={styles.root} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
-          <View style={styles.container}>
-            <View style={styles.hero}>
-              <View style={styles.heroGlowTopLeft} />
-              <View style={styles.heroGlowBottomRight} />
+    <ImageBackground
+      source={{ uri: 'https://images.unsplash.com/photo-1519167758481-83f550bb49b3?ixlib=rb-4.0.3&auto=format&fit=crop&w=1974&q=80' }} // Elegant event hall
+      style={styles.backgroundImage}
+      resizeMode="cover"
+    >
+      <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
 
-              <View style={styles.brandRow}>
-                <View style={styles.brandMark}>
-                  <Feather name="map-pin" size={18} color={palette.primary} />
+      {/* Dark Overlay */}
+      <View style={styles.overlay} />
+
+      <SafeAreaView style={styles.safeArea}>
+        <KeyboardAvoidingView style={styles.root} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+          <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
+            <View style={styles.container}>
+
+              {/* Branding Section */}
+              <View style={styles.brandingSection}>
+                <View style={styles.logoCircle}>
+                  <FontAwesome5 name="wine-glass-alt" size={24} color={palette.primary} />
                 </View>
-                <Text style={styles.brandName}>Venso</Text>
+                <Text style={styles.brandTitle}>VENSO</Text>
+                <Text style={styles.tagline}>Unlock exclusive events & venues</Text>
               </View>
 
-              <Text style={styles.headline}>Find your next stay</Text>
-              <Text style={styles.tagline}>Curated villas, lofts, and experiences—book in minutes.</Text>
-            </View>
+              {/* Login Form */}
+              <View style={styles.formCard}>
 
-            <View style={styles.card}>
-              <Text style={styles.cardTitle}>Welcome back</Text>
-              <Text style={styles.cardSubtitle}>Sign in to manage your bookings.</Text>
-
-              <View style={styles.field}>
-                <Text style={styles.label}>Email</Text>
-                <View style={styles.inputRow}>
-                  <Feather name="mail" size={18} color={palette.muted} />
-                  <TextInput
-                    style={styles.input}
-                    value={email}
-                    autoCapitalize="none"
-                    keyboardType="email-address"
-                    placeholder="you@company.com"
-                    placeholderTextColor={palette.muted}
-                    onChangeText={setEmail}
-                    returnKeyType="next"
-                    autoCorrect={false}
-                  />
+                <View style={styles.field}>
+                  <Text style={styles.label}>Email Address</Text>
+                  <View style={styles.inputContainer}>
+                    <Feather name="mail" size={18} color={palette.muted} />
+                    <TextInput
+                      style={styles.input}
+                      value={email}
+                      placeholder="you@example.com"
+                      placeholderTextColor={'rgba(0,0,0,0.4)'}
+                      autoCapitalize="none"
+                      keyboardType="email-address"
+                      onChangeText={setEmail}
+                      returnKeyType="next"
+                    />
+                  </View>
                 </View>
-              </View>
 
-              <View style={styles.field}>
-                <Text style={styles.label}>Password</Text>
-                <View style={styles.inputRow}>
-                  <Feather name="lock" size={18} color={palette.muted} />
-                  <TextInput
-                    style={styles.input}
-                    value={password}
-                    placeholder="••••••••"
-                    placeholderTextColor={palette.muted}
-                    secureTextEntry={!passwordVisible}
-                    onChangeText={setPassword}
-                    returnKeyType="done"
-                  />
-                  <Pressable
-                    onPress={() => setPasswordVisible((value) => !value)}
-                    hitSlop={10}
-                    style={styles.iconButton}
-                    accessibilityRole="button"
-                    accessibilityLabel={passwordVisible ? 'Hide password' : 'Show password'}
-                  >
-                    <Feather name={passwordVisible ? 'eye-off' : 'eye'} size={18} color={palette.muted} />
+                <View style={styles.field}>
+                  <Text style={styles.label}>Password</Text>
+                  <View style={styles.inputContainer}>
+                    <Feather name="lock" size={18} color={palette.muted} />
+                    <TextInput
+                      style={styles.input}
+                      value={password}
+                      placeholder="••••••••"
+                      placeholderTextColor={'rgba(0,0,0,0.4)'}
+                      secureTextEntry={!passwordVisible}
+                      onChangeText={setPassword}
+                      returnKeyType="done"
+                    />
+                    <Pressable onPress={() => setPasswordVisible(!passwordVisible)} hitSlop={10}>
+                      <Feather name={passwordVisible ? 'eye-off' : 'eye'} size={18} color={palette.muted} />
+                    </Pressable>
+                  </View>
+                </View>
+
+                <Pressable onPress={() => setError('')} style={styles.forgotPassword}>
+                  <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
+                </Pressable>
+
+                {error ? (
+                  <View style={styles.errorBox}>
+                    <Feather name="alert-circle" size={14} color="#F04438" />
+                    <Text style={styles.errorText}>{error}</Text>
+                  </View>
+                ) : null}
+
+                <Pressable
+                  style={[styles.button, isSubmitDisabled && styles.buttonDisabled]}
+                  onPress={handleSubmit}
+                  disabled={isSubmitDisabled}
+                >
+                  {loading ? (
+                    <ActivityIndicator color="#fff" />
+                  ) : (
+                    <Text style={styles.buttonText}>Log In</Text>
+                  )}
+                </Pressable>
+
+                <View style={styles.footerRow}>
+                  <Text style={styles.footerText}>New to Venso? </Text>
+                  <Pressable onPress={() => setError('')}>
+                    <Text style={styles.signUpText}>Sign Up</Text>
                   </Pressable>
                 </View>
+
               </View>
 
-              <View style={styles.linksRow}>
-                <Pressable onPress={() => setError('')}>
-                  <Text style={styles.linkMuted}>Forgot password?</Text>
-                </Pressable>
-              </View>
-
-              {error ? (
-                <View style={styles.errorBox}>
-                  <Feather name="alert-circle" size={16} color="#F04438" />
-                  <Text style={styles.errorText}>{error}</Text>
-                </View>
-              ) : null}
-
-              <Pressable
-                style={[styles.button, isSubmitDisabled && styles.buttonDisabled]}
-                onPress={handleSubmit}
-                disabled={isSubmitDisabled}
-              >
-                {loading ? (
-                  <ActivityIndicator color={palette.surface} />
-                ) : (
-                  <Text style={styles.buttonText}>Sign in</Text>
-                )}
-              </Pressable>
-
-              <View style={styles.footerRow}>
-                <Text style={styles.footerText}>New here?</Text>
-                <Pressable onPress={() => setError('')}>
-                  <Text style={styles.footerLink}>Create an account</Text>
-                </Pressable>
-              </View>
             </View>
-
-            <Text style={styles.legal}>
-              By continuing, you agree to our Terms and acknowledge our Privacy Policy.
-            </Text>
-          </View>
-        </TouchableWithoutFeedback>
-      </KeyboardAvoidingView>
-    </SafeAreaView>
+          </TouchableWithoutFeedback>
+        </KeyboardAvoidingView>
+      </SafeAreaView>
+    </ImageBackground>
   );
 };
 
 const styles = StyleSheet.create({
+  backgroundImage: {
+    flex: 1,
+    width: '100%',
+    height: '100%',
+  },
+  overlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.65)', // Darken background image
+  },
   safeArea: {
     flex: 1,
-    backgroundColor: palette.background
   },
   root: {
     flex: 1,
-    backgroundColor: palette.background
   },
   container: {
     flex: 1,
-    padding: 24,
-    backgroundColor: palette.background
+    paddingHorizontal: 24,
+    justifyContent: 'center',
+    gap: 40,
   },
-  hero: {
-    paddingTop: 18,
-    paddingBottom: 22,
-    borderRadius: 24,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: palette.border,
-    backgroundColor: palette.surface,
-    paddingHorizontal: 18
-  },
-  heroGlowTopLeft: {
-    position: 'absolute',
-    top: -80,
-    left: -80,
-    width: 180,
-    height: 180,
-    borderRadius: 999,
-    backgroundColor: 'rgba(216,248,79,0.35)'
-  },
-  heroGlowBottomRight: {
-    position: 'absolute',
-    bottom: -90,
-    right: -90,
-    width: 220,
-    height: 220,
-    borderRadius: 999,
-    backgroundColor: 'rgba(25,72,255,0.10)'
-  },
-  brandRow: {
-    flexDirection: 'row',
+  brandingSection: {
     alignItems: 'center',
-    gap: 10
+    gap: 8,
   },
-  brandMark: {
-    width: 36,
-    height: 36,
-    borderRadius: 12,
+  logoCircle: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: '#fff',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#EEF2FF',
-    borderWidth: 1,
-    borderColor: palette.border
+    marginBottom: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 10,
+    elevation: 5,
   },
-  brandName: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: palette.primary,
-    letterSpacing: 0.2
-  },
-  headline: {
-    marginTop: 14,
-    fontSize: 26,
-    fontWeight: '800',
-    color: palette.primary
+  brandTitle: {
+    fontSize: 32,
+    fontWeight: '900',
+    color: '#fff',
+    letterSpacing: 4,
   },
   tagline: {
-    marginTop: 8,
-    color: palette.muted,
-    lineHeight: 20
+    color: 'rgba(255,255,255,0.8)',
+    fontSize: 16,
+    textAlign: 'center',
   },
-  card: {
-    marginTop: 16,
-    backgroundColor: palette.surface,
+  formCard: {
+    backgroundColor: 'rgba(255,255,255,0.95)', // Nearly opaque white for readability
     borderRadius: 24,
-    padding: 18,
-    gap: 12,
-    borderWidth: 1,
-    borderColor: palette.border
-  },
-  cardTitle: {
-    fontSize: 20,
-    fontWeight: '800',
-    color: palette.primary
-  },
-  cardSubtitle: {
-    color: palette.muted,
-    marginTop: -6,
-    marginBottom: 6
+    padding: 24,
+    gap: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.25,
+    shadowRadius: 20,
+    elevation: 10,
   },
   field: {
-    gap: 8
+    gap: 8,
   },
   label: {
     fontSize: 12,
-    fontWeight: '600',
-    color: palette.muted
+    fontWeight: '700',
+    color: palette.primary, // Teal label
+    textTransform: 'uppercase',
   },
-  inputRow: {
+  inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
+    backgroundColor: '#F3F4F6',
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    height: 50,
+    gap: 10,
     borderWidth: 1,
     borderColor: palette.border,
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    gap: 10,
-    backgroundColor: '#FBFBFF'
   },
   input: {
     flex: 1,
     fontSize: 16,
-    color: palette.text
+    color: palette.text,
   },
-  iconButton: {
-    width: 36,
-    height: 36,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 10
+  forgotPassword: {
+    alignSelf: 'flex-end',
   },
-  linksRow: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end'
-  },
-  linkMuted: {
+  forgotPasswordText: {
     color: palette.muted,
-    fontWeight: '600'
+    fontSize: 13,
+    fontWeight: '600',
   },
   errorBox: {
     flexDirection: 'row',
-    gap: 10,
-    alignItems: 'flex-start',
     backgroundColor: '#FEF3F2',
-    borderWidth: 1,
-    borderColor: '#FEE4E2',
-    padding: 12,
-    borderRadius: 12
+    padding: 10,
+    borderRadius: 8,
+    gap: 8,
+    alignItems: 'center',
   },
   errorText: {
-    flex: 1,
     color: '#B42318',
-    fontSize: 13,
-    lineHeight: 18
+    fontSize: 12,
   },
   button: {
-    marginTop: 16,
     backgroundColor: palette.primary,
-    borderRadius: 12,
-    paddingVertical: 14,
-    alignItems: 'center'
+    height: 54,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 8,
+    shadowColor: palette.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
   },
   buttonDisabled: {
-    opacity: 0.55
+    opacity: 0.6,
   },
   buttonText: {
-    color: palette.surface,
+    color: '#fff',
     fontSize: 16,
-    fontWeight: '800'
+    fontWeight: '800',
+    letterSpacing: 0.5,
   },
   footerRow: {
-    marginTop: 6,
     flexDirection: 'row',
     justifyContent: 'center',
-    gap: 6
+    marginTop: 8,
   },
   footerText: {
     color: palette.muted,
-    fontWeight: '600'
+    fontSize: 14,
   },
-  footerLink: {
-    color: palette.secondary,
-    fontWeight: '800'
+  signUpText: {
+    color: palette.primary,
+    fontSize: 14,
+    fontWeight: '700',
   },
-  legal: {
-    marginTop: 14,
-    textAlign: 'center',
-    color: palette.muted,
-    fontSize: 12,
-    lineHeight: 18
-  }
 });
 
 export default LoginScreen;

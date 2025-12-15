@@ -16,6 +16,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '@/navigation/types';
 import { usePackagesStore } from '@/store/packagesStore';
 import palette from '@/theme/colors';
+import { formatCurrency } from '@/utils/formatCurrency';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'PackageDetails'>;
 
@@ -118,7 +119,7 @@ const PackageDetailsScreen = ({ route, navigation }: Props) => {
             </View>
           </View>
           <View style={styles.priceWrapper}>
-            <Text style={styles.price}>${selectedPackage.price}</Text>
+            <Text style={styles.price}>{formatCurrency(selectedPackage.price)}</Text>
             <Text style={styles.priceHint}>per package</Text>
           </View>
         </View>
@@ -173,7 +174,7 @@ const PackageDetailsScreen = ({ route, navigation }: Props) => {
       <View style={styles.ctaBar}>
         <View>
           <Text style={styles.ctaLabel}>Total</Text>
-          <Text style={styles.ctaPrice}>${selectedPackage.price}</Text>
+          <Text style={styles.ctaPrice}>{formatCurrency(selectedPackage.price)}</Text>
         </View>
         <Pressable style={styles.bookButton}>
           <Text style={styles.bookText}>Book now</Text>

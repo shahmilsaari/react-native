@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -7,28 +7,24 @@ import {
   FlatList,
   RefreshControl,
   Pressable,
-  ScrollView
+  ScrollView,
+  StatusBar
 } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Feather } from '@expo/vector-icons';
+import { Feather, Ionicons } from '@expo/vector-icons';
 
-import PackageCard from '@/components/PackageCard';
-import { usePackagesStore } from '@/store/packagesStore';
+import PopularHotelCard from '@/components/PopularHotelCard';
+import NearYouCard from '@/components/NearYouCard';
+import { ServiceListItem } from '@/components/ServiceCard';
+import { trpc } from '@/lib/trpc';
 import { useAuthStore } from '@/store/authStore';
 import palette from '@/theme/colors';
 import { RootStackParamList } from '@/navigation/types';
-import { PackageCategory } from '@/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Packages'>;
 
-const categoryFilters: Array<{ label: string; value: 'all' | PackageCategory }> = [
-  { label: 'All', value: 'all' },
-  { label: 'Culture', value: 'culture' },
-  { label: 'Relax', value: 'relax' },
-  { label: 'Adventure', value: 'adventure' }
-];
-
+// Navigation items mock
 const navItems = [
   { label: 'Explore', icon: 'home' as const },
   { label: 'Map', icon: 'map-pin' as const },
@@ -37,27 +33,16 @@ const navItems = [
 ];
 
 const PackagesScreen = ({ navigation }: Props) => {
-  const packages = usePackagesStore((state) => state.packages);
-  const refreshPackages = usePackagesStore((state) => state.refreshPackages);
-  const logout = useAuthStore((state) => state.logout);
+  const servicesQuery = trpc.services.getServices.useQuery(undefined, { retry: 1 });
   const user = useAuthStore((state) => state.user);
+
   const [query, setQuery] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState<'all' | PackageCategory>('all');
-  const [refreshing, setRefreshing] = useState(false);
-  const [searchExpanded, setSearchExpanded] = useState(false);
-  const searchInputRef = useRef<TextInput>(null);
+  const [selectedCategory, setSelectedCategory] = useState<string>('all');
 
-  useEffect(() => {
-    if (searchExpanded) {
-      requestAnimationFrame(() => searchInputRef.current?.focus());
-    }
-  }, [searchExpanded]);
-
+  // Greeting Logic
   const greeting = useMemo(() => {
-    const hour = new Date().getHours();
-    if (hour < 12) return 'Good morning';
-    if (hour < 18) return 'Good afternoon';
-    return 'Good evening';
+    // Basic "Hello" as per design, could be dynamic
+    return 'Hello';
   }, []);
 
   const displayName = useMemo(() => {
@@ -67,112 +52,158 @@ const PackagesScreen = ({ navigation }: Props) => {
     return user?.email ?? 'Guest';
   }, [user?.email, user?.firstName, user?.lastName]);
 
-  const filteredPackages = useMemo(() => {
-    const normalized = query.toLowerCase();
+  // Data Processing
+  const services = useMemo(() => {
+    const raw = servicesQuery.data as any;
+    const list = Array.isArray(raw) ? raw : raw?.data;
+    return (Array.isArray(list) ? list : []) as ServiceListItem[];
+  }, [servicesQuery.data]);
 
-    return packages.filter(
-      (item) =>
-        (item.name.toLowerCase().includes(normalized) ||
-          item.destination.toLowerCase().includes(normalized) ||
-          item.category.toLowerCase().includes(normalized)) &&
-        (selectedCategory === 'all' || item.category === selectedCategory)
-    );
-  }, [packages, query, selectedCategory]);
+  const categories = useMemo(() => {
+    const unique = new Set<string>();
+    services.forEach((service) => {
+      if (typeof service.category === 'string' && service.category.trim()) {
+        unique.add(service.category.trim());
+      }
+    });
+    return ['all', ...Array.from(unique).sort((a, b) => a.localeCompare(b))];
+  }, [services]);
 
-  const handleRefresh = async () => {
-    setRefreshing(true);
-    await refreshPackages();
-    setRefreshing(false);
-  };
+  const filteredServices = useMemo(() => {
+    const normalized = query.trim().toLowerCase();
+    return services.filter((item) => {
+      const matchesCategory = selectedCategory === 'all' ? true : item.category === selectedCategory;
+      if (!matchesCategory) return false;
+      if (!normalized) return true;
+      const haystack = [item.name, item.serviceDetails, item.vendorCompany, item.category]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase();
+      return haystack.includes(normalized);
+    });
+  }, [query, selectedCategory, services]);
+
+  const popularServices = useMemo(() => {
+    // Just take the first 5 for now as "Popular"
+    return filteredServices.slice(0, 5);
+  }, [filteredServices]);
 
   const renderHeader = () => (
-    <View style={styles.hero}>
+    <View style={styles.headerContainer}>
+      {/* Top Bar */}
       <View style={styles.topBar}>
-        <View>
-          <Text style={styles.greeting}>{greeting}</Text>
-          <Text style={styles.profileName} numberOfLines={1}>
-            {displayName}
-          </Text>
+        <View style={styles.greetingRow}>
+          <Text style={styles.greetingText}>{greeting} {displayName}!</Text>
+          <Text style={styles.waveEmoji}>👋</Text>
         </View>
-        <View style={styles.topBarActions}>
-          {searchExpanded ? (
-            <Pressable
-              style={styles.iconButton}
-              onPress={() => {
-                setSearchExpanded(false);
-                setQuery('');
-              }}
-            >
-              <Feather name="x" size={20} color={palette.primary} />
-            </Pressable>
-          ) : (
-            <Pressable style={styles.iconButton} onPress={() => setSearchExpanded(true)}>
-              <Feather name="search" size={18} color={palette.primary} />
-            </Pressable>
-          )}
-          <Pressable style={styles.iconButton} onPress={logout}>
-            <Feather name="menu" size={20} color={palette.primary} />
-          </Pressable>
-        </View>
+        <Pressable style={styles.notificationBtn}>
+          <Feather name="bell" size={20} color={palette.text} />
+          <View style={styles.badge}>
+            <Text style={styles.badgeText}>3</Text>
+          </View>
+        </Pressable>
       </View>
 
-      {searchExpanded ? (
-        <View style={styles.searchField}>
-          <Feather name="search" size={18} color={palette.muted} />
-          <TextInput
-            ref={searchInputRef}
-            placeholder="Search cities, stays, experiences"
-            placeholderTextColor={palette.muted}
-            style={styles.searchInput}
-            value={query}
-            onChangeText={setQuery}
-            autoCapitalize="none"
-            autoCorrect={false}
-            returnKeyType="search"
-          />
-          {query.length ? (
-            <Pressable onPress={() => setQuery('')} hitSlop={10}>
-              <Feather name="x-circle" size={18} color={palette.muted} />
-            </Pressable>
-          ) : null}
-        </View>
-      ) : null}
+      <Text style={styles.mainTitle}>Plan your perfect event</Text>
 
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categories}>
-        {categoryFilters.map((filter) => {
-          const isActive = selectedCategory === filter.value;
+      {/* Search Bar */}
+      <View style={styles.searchBar}>
+        <Feather name="search" size={20} color={palette.muted} style={styles.searchIcon} />
+        <TextInput
+          placeholder="Search hotel"
+          placeholderTextColor={palette.muted}
+          style={styles.searchInput}
+          value={query}
+          onChangeText={setQuery}
+        />
+        <Pressable style={styles.filterBtn}>
+          <Ionicons name="options-outline" size={20} color={palette.text} />
+        </Pressable>
+      </View>
+
+      {/* Categories */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.categoryScroll}
+      >
+        {categories.slice(0, 4).map((cat) => { // Limit to 4 for visual match if many
+          // Or just map all
+          const isActive = selectedCategory === cat;
+          // If 'all' is renamed to 'Popular' in design? 
+          // Design has: Popular, Modern, Beach...
+          // I'll map 'all' to 'Popular' label for display if needed, but logic remains.
+          const label = cat === 'all' ? 'Popular' : cat;
           return (
             <Pressable
-              key={filter.value}
+              key={cat}
               style={[styles.categoryPill, isActive && styles.categoryPillActive]}
-              onPress={() => setSelectedCategory(filter.value)}
+              onPress={() => setSelectedCategory(cat)}
             >
-              <Text style={[styles.categoryLabel, isActive && styles.categoryLabelActive]}>{filter.label}</Text>
+              <Text style={[styles.categoryText, isActive && styles.categoryTextActive]}>
+                {label.charAt(0).toUpperCase() + label.slice(1)}
+              </Text>
             </Pressable>
           );
         })}
       </ScrollView>
+
+      {/* Most Popular Section */}
+      <View style={styles.sectionHeader}>
+        <Text style={styles.sectionTitle}>Most popular</Text>
+        <Pressable>
+          <Text style={styles.seeAllText}>See all</Text>
+        </Pressable>
+      </View>
+
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.popularScroll}
+      >
+        {popularServices.map((item) => (
+          <PopularHotelCard
+            key={item.id}
+            data={item}
+            onPress={() => navigation.navigate('ServiceDetails', { serviceId: item.id })}
+          />
+        ))}
+      </ScrollView>
+
+      {/* Near You Section Header */}
+      <View style={[styles.sectionHeader, styles.nearYouHeader]}>
+        <View style={styles.nearYouTitleRow}>
+          <Text style={styles.sectionTitle}>Near you</Text>
+          <Text style={styles.fireEmoji}>🔥</Text>
+        </View>
+        <Pressable>
+          <Text style={styles.seeAllText}>See all</Text>
+        </Pressable>
+      </View>
     </View>
   );
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+      <StatusBar barStyle="dark-content" />
       <FlatList
-        data={filteredPackages}
+        data={filteredServices}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.listContent}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
         renderItem={({ item }) => (
-          <PackageCard data={item} onPress={() => navigation.navigate('PackageDetails', { packageId: item.id })} />
+          <NearYouCard
+            data={item}
+            onPress={() => navigation.navigate('ServiceDetails', { serviceId: item.id })}
+          />
         )}
         ListHeaderComponent={renderHeader}
-        ListEmptyComponent={
-          <Text style={styles.emptyText}>No stays match "{query}". Try another keyword or category.</Text>
+        refreshControl={
+          <RefreshControl refreshing={servicesQuery.isFetching && !servicesQuery.isLoading} onRefresh={() => servicesQuery.refetch()} />
         }
-        keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       />
 
+      {/* Bottom Nav */}
       <View style={styles.bottomNav}>
         {navItems.map((item, index) => {
           const isActive = index === 0;
@@ -203,87 +234,149 @@ const PackagesScreen = ({ navigation }: Props) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: palette.background
+    backgroundColor: '#F9FAFB', // Light gray background
   },
   listContent: {
-    paddingHorizontal: 20,
-    paddingBottom: 160
+    paddingBottom: 100, // Space for bottom nav
   },
-  hero: {
-    paddingTop: 8,
-    paddingBottom: 12,
-    gap: 18
+  headerContainer: {
+    paddingHorizontal: 20,
+    paddingTop: 10,
+    paddingBottom: 10,
   },
   topBar: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center'
+    alignItems: 'center',
+    marginBottom: 16,
   },
-  greeting: {
-    fontSize: 14,
-    color: palette.muted
-  },
-  profileName: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: palette.primary,
-    marginTop: 4
-  },
-  topBarActions: {
+  greetingRow: {
     flexDirection: 'row',
-    gap: 12
+    alignItems: 'center',
+    gap: 6,
   },
-  iconButton: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    borderWidth: 1,
-    borderColor: palette.border,
+  greetingText: {
+    fontSize: 16,
+    color: palette.muted,
+  },
+  waveEmoji: {
+    fontSize: 16,
+  },
+  notificationBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#fff',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: palette.surface
+    shadowColor: '#000',
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
   },
-  searchField: {
-    marginTop: 14,
+  badge: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#EF4444',
+    borderWidth: 1,
+    borderColor: '#fff',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  badgeText: { // Too small for text, just a dot usually, but design has number
+    position: 'absolute',
+    // adjusting for number visibility mock
+    opacity: 0,
+  },
+  mainTitle: {
+    fontSize: 28,
+    fontWeight: '700',
+    color: palette.text,
+    marginBottom: 20,
+  },
+  searchBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
-    borderRadius: 18,
-    backgroundColor: palette.surface,
-    paddingHorizontal: 14,
-    borderWidth: 1,
-    borderColor: palette.border,
-    height: 54
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    height: 52,
+    marginBottom: 24,
+    shadowColor: '#000',
+    shadowOpacity: 0.03,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  searchIcon: {
+    marginRight: 12,
   },
   searchInput: {
     flex: 1,
+    fontSize: 16,
     color: palette.text,
-    fontSize: 15
   },
-  categories: {
+  filterBtn: {
+    padding: 4,
+  },
+  categoryScroll: {
     gap: 12,
-    paddingVertical: 6
+    paddingBottom: 24,
   },
   categoryPill: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 18,
-    backgroundColor: '#EEF2FF'
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 14,
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: palette.border,
   },
   categoryPillActive: {
-    backgroundColor: palette.primary
+    backgroundColor: palette.primary,
+    borderColor: palette.primary,
   },
-  categoryLabel: {
-    color: palette.primary,
-    fontWeight: '600'
-  },
-  categoryLabelActive: {
-    color: palette.surface
-  },
-  emptyText: {
-    textAlign: 'center',
+  categoryText: {
+    fontSize: 14,
+    fontWeight: '600',
     color: palette.muted,
-    marginTop: 40
+  },
+  categoryTextActive: {
+    color: '#fff',
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: palette.text,
+  },
+  seeAllText: {
+    fontSize: 14,
+    color: palette.primary,
+    fontWeight: '600',
+  },
+  popularScroll: {
+    paddingRight: 20,
+    marginBottom: 24,
+    overflow: 'visible', // Attempt to let shadows show
+  },
+  nearYouHeader: {
+    marginTop: 8,
+  },
+  nearYouTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  fireEmoji: {
+    fontSize: 20,
   },
   bottomNav: {
     position: 'absolute',

@@ -5,6 +5,7 @@ import { Feather } from '@expo/vector-icons';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import type { RootStackParamList } from '@/navigation/types';
+import { trpc } from '@/lib/trpc';
 import { useAuthStore } from '@/store/authStore';
 import palette from '@/theme/colors';
 
@@ -13,9 +14,16 @@ type Props = NativeStackScreenProps<RootStackParamList, 'Profile'>;
 const ProfileScreen = ({ navigation }: Props) => {
   const user = useAuthStore((state) => state.user);
   const logout = useAuthStore((state) => state.logout);
+  const bookingsQuery = trpc.bookings.my.useQuery(undefined, { retry: 1 });
 
   const displayName =
     user?.firstName || user?.lastName ? `${user?.firstName ?? ''} ${user?.lastName ?? ''}`.trim() : undefined;
+
+  const bookingsCount = React.useMemo(() => {
+    const raw = bookingsQuery.data as any;
+    const list = Array.isArray(raw) ? raw : raw?.data;
+    return Array.isArray(list) ? list.length : 0;
+  }, [bookingsQuery.data]);
 
   const handleLogout = () => {
     logout();
@@ -61,7 +69,7 @@ const ProfileScreen = ({ navigation }: Props) => {
           <Feather name="chevron-right" size={18} color={palette.muted} />
         </Pressable>
 
-        <Pressable style={styles.row} onPress={() => {}}>
+        <Pressable style={styles.row} onPress={() => navigation.navigate('Bookings')}>
           <View style={styles.rowLeft}>
             <View style={styles.rowIcon}>
               <Feather name="briefcase" size={18} color={palette.primary} />
@@ -71,7 +79,16 @@ const ProfileScreen = ({ navigation }: Props) => {
               <Text style={styles.rowSubtitle}>Manage reservations and receipts</Text>
             </View>
           </View>
-          <Feather name="chevron-right" size={18} color={palette.muted} />
+          <View style={styles.rowRight}>
+            {bookingsQuery.isLoading ? (
+              <View style={styles.badgeSkeleton} />
+            ) : (
+              <View style={styles.badge}>
+                <Text style={styles.badgeText}>{bookingsCount}</Text>
+              </View>
+            )}
+            <Feather name="chevron-right" size={18} color={palette.muted} />
+          </View>
         </Pressable>
       </View>
 
@@ -191,6 +208,35 @@ const styles = StyleSheet.create({
     color: palette.muted,
     fontSize: 12,
     marginTop: 2
+  },
+  rowRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10
+  },
+  badge: {
+    minWidth: 28,
+    height: 28,
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#EEF2FF',
+    borderWidth: 1,
+    borderColor: palette.border
+  },
+  badgeText: {
+    color: palette.primary,
+    fontWeight: '900',
+    fontSize: 12
+  },
+  badgeSkeleton: {
+    width: 28,
+    height: 28,
+    borderRadius: 999,
+    backgroundColor: '#EEF2FF',
+    borderWidth: 1,
+    borderColor: palette.border
   },
   footer: {
     marginTop: 'auto',
