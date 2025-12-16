@@ -6,7 +6,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import type { RootStackParamList } from '@/navigation/types';
 import { trpc } from '@/lib/trpc';
-import palette from '@/theme/colors';
+import { useTheme } from '@/theme/ThemeContext';
 import { formatCurrency } from '@/utils/formatCurrency';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'BookingDetails'>;
@@ -48,7 +48,7 @@ const formatTime = (iso?: string) => {
   });
 };
 
-const StatusBadge = ({ status }: { status?: string }) => {
+const StatusBadge = ({ status, styles }: { status?: string; styles: any }) => {
   const normalized = status?.toLowerCase() ?? 'pending';
   let bg = '#FEF3F2';
   let color = '#B42318';
@@ -75,11 +75,11 @@ const StatusBadge = ({ status }: { status?: string }) => {
   );
 };
 
-const InfoCard = ({ title, children, icon }: { title: string; children: React.ReactNode; icon: string }) => (
+const InfoCard = ({ title, children, icon, styles, theme }: { title: string; children: React.ReactNode; icon: string; styles: any; theme: any }) => (
   <View style={styles.card}>
     <View style={styles.cardHeader}>
       <View style={styles.cardIcon}>
-        <Feather name={icon as any} size={16} color={palette.primary} />
+        <Feather name={icon as any} size={16} color={theme.primary} />
       </View>
       <Text style={styles.cardTitle}>{title}</Text>
     </View>
@@ -89,7 +89,7 @@ const InfoCard = ({ title, children, icon }: { title: string; children: React.Re
   </View>
 );
 
-const DetailItem = ({ label, value }: { label: string; value?: string | React.ReactNode }) => (
+const DetailItem = ({ label, value, styles }: { label: string; value?: string | React.ReactNode; styles: any }) => (
   <View style={styles.detailItem}>
     <Text style={styles.detailLabel}>{label}</Text>
     {typeof value === 'string' ? (
@@ -102,6 +102,8 @@ const DetailItem = ({ label, value }: { label: string; value?: string | React.Re
 
 const BookingDetailsScreen = ({ navigation, route }: Props) => {
   const bookingId = route.params.bookingId;
+  const { theme } = useTheme();
+  const styles = useMemo(() => createStyles(theme), [theme]);
   const query = trpc.bookings.my.useQuery(undefined, { retry: 1 });
 
   const booking = useMemo(() => {
@@ -115,7 +117,7 @@ const BookingDetailsScreen = ({ navigation, route }: Props) => {
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <View style={styles.header}>
         <Pressable style={styles.navButton} onPress={() => navigation.goBack()}>
-          <Feather name="arrow-left" size={20} color={palette.text} />
+          <Feather name="arrow-left" size={20} color={theme.text} />
         </Pressable>
         <Text style={styles.headerTitle}>Booking Details</Text>
         <View style={styles.navButton} />
@@ -123,12 +125,12 @@ const BookingDetailsScreen = ({ navigation, route }: Props) => {
 
       {query.isLoading ? (
         <View style={styles.centerBox}>
-          <ActivityIndicator size="small" color={palette.primary} />
+          <ActivityIndicator size="small" color={theme.primary} />
           <Text style={styles.loadingText}>Loading...</Text>
         </View>
       ) : !booking ? (
         <View style={styles.centerBox}>
-          <Feather name="alert-circle" size={40} color={palette.muted} />
+          <Feather name="alert-circle" size={40} color={theme.muted} />
           <Text style={styles.errorTitle}>Booking not found</Text>
           <Pressable style={styles.retryButton} onPress={() => query.refetch()}>
             <Text style={styles.retryText}>Refresh</Text>
@@ -143,7 +145,7 @@ const BookingDetailsScreen = ({ navigation, route }: Props) => {
               <Text style={styles.bookingIdLabel}>Booking ID</Text>
               <Text style={styles.bookingIdValue}>#{booking.bookingNo ?? booking.id.slice(0, 8)}</Text>
             </View>
-            <StatusBadge status={booking.status} />
+            <StatusBadge status={booking.status} styles={styles} />
           </View>
 
           {/* Service Highlight */}
@@ -159,18 +161,18 @@ const BookingDetailsScreen = ({ navigation, route }: Props) => {
           </View>
 
           {/* Event Details */}
-          <InfoCard title="Event Information" icon="calendar">
-            <DetailItem label="Event Name" value={booking.event?.name} />
-            <DetailItem label="Date" value={formatDate(booking.event?.eventDate)} />
-            <DetailItem label="Time" value={`${formatTime(booking.startAt)} - ${formatTime(booking.endAt)}`} />
-            <DetailItem label="Location" value={booking.event?.location} />
+          <InfoCard title="Event Information" icon="calendar" styles={styles} theme={theme}>
+            <DetailItem label="Event Name" value={booking.event?.name} styles={styles} />
+            <DetailItem label="Date" value={formatDate(booking.event?.eventDate)} styles={styles} />
+            <DetailItem label="Time" value={`${formatTime(booking.startAt)} - ${formatTime(booking.endAt)}`} styles={styles} />
+            <DetailItem label="Location" value={booking.event?.location} styles={styles} />
           </InfoCard>
 
           {/* Participants */}
-          <InfoCard title="Participants" icon="users">
-            <DetailItem label="Vendor" value={booking.vendorCompany?.name} />
-            <DetailItem label="Customer" value={booking.customerUser?.email} />
-            {booking.customerCompany && <DetailItem label="Company" value={booking.customerCompany.name} />}
+          <InfoCard title="Participants" icon="users" styles={styles} theme={theme}>
+            <DetailItem label="Vendor" value={booking.vendorCompany?.name} styles={styles} />
+            <DetailItem label="Customer" value={booking.customerUser?.email} styles={styles} />
+            {booking.customerCompany && <DetailItem label="Company" value={booking.customerCompany.name} styles={styles} />}
           </InfoCard>
 
           <View style={styles.divider} />
@@ -186,10 +188,10 @@ const BookingDetailsScreen = ({ navigation, route }: Props) => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (theme: any) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F9FAFB', // Light gray background
+    backgroundColor: theme.background,
   },
   header: {
     flexDirection: 'row',
@@ -197,9 +199,9 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 20,
     paddingVertical: 16,
-    backgroundColor: '#fff',
+    backgroundColor: theme.surface,
     borderBottomWidth: 1,
-    borderBottomColor: palette.border,
+    borderBottomColor: theme.border,
   },
   navButton: {
     width: 40,
@@ -210,7 +212,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: palette.text,
+    color: theme.text,
   },
   scrollContent: {
     padding: 20,
@@ -223,19 +225,19 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   loadingText: {
-    color: palette.muted,
+    color: theme.muted,
     fontWeight: '600',
   },
   errorTitle: {
     fontSize: 16,
     fontWeight: '700',
-    color: palette.text,
+    color: theme.text,
     marginTop: 8,
   },
   retryButton: {
     paddingVertical: 10,
     paddingHorizontal: 20,
-    backgroundColor: palette.primary,
+    backgroundColor: theme.primary,
     borderRadius: 12,
     marginTop: 10,
   },
@@ -247,18 +249,18 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: '#fff',
+    backgroundColor: theme.surface,
     padding: 20,
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: palette.border,
+    borderColor: theme.border,
     shadowColor: '#000',
     shadowOpacity: 0.03,
     shadowRadius: 8,
     elevation: 2,
   },
   bookingIdLabel: {
-    color: palette.muted,
+    color: theme.muted,
     fontSize: 12,
     fontWeight: '600',
     textTransform: 'uppercase',
@@ -266,7 +268,7 @@ const styles = StyleSheet.create({
   bookingIdValue: {
     fontSize: 16,
     fontWeight: '800',
-    color: palette.text,
+    color: theme.text,
     marginTop: 4,
   },
   statusBadge: {
@@ -279,16 +281,16 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   serviceHighlight: {
-    backgroundColor: '#fff',
+    backgroundColor: theme.surface,
     borderRadius: 24,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: palette.border,
+    borderColor: theme.border,
   },
   serviceImage: {
     width: '100%',
     height: 180,
-    backgroundColor: '#f0f0f0',
+    backgroundColor: theme.surfaceHighlight,
   },
   serviceMeta: {
     padding: 20,
@@ -296,20 +298,20 @@ const styles = StyleSheet.create({
   serviceName: {
     fontSize: 20,
     fontWeight: '800',
-    color: palette.text,
+    color: theme.text,
     marginBottom: 6,
   },
   servicePrice: {
     fontSize: 18,
     fontWeight: '700',
-    color: palette.primary,
+    color: theme.primary,
   },
   card: {
-    backgroundColor: '#fff',
+    backgroundColor: theme.surface,
     borderRadius: 20,
     padding: 20,
     borderWidth: 1,
-    borderColor: palette.border,
+    borderColor: theme.border,
     gap: 16,
   },
   cardHeader: {
@@ -322,14 +324,14 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: '#EFF8FF',
+    backgroundColor: '#EFF8FF', // Could be theme derived if needed?
     alignItems: 'center',
     justifyContent: 'center',
   },
   cardTitle: {
     fontSize: 16,
     fontWeight: '700',
-    color: palette.text,
+    color: theme.text,
   },
   cardContent: {
     gap: 16,
@@ -340,12 +342,12 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
   },
   detailLabel: {
-    color: palette.muted,
+    color: theme.muted,
     fontSize: 14,
     flex: 1,
   },
   detailValue: {
-    color: palette.text,
+    color: theme.text,
     fontWeight: '600',
     fontSize: 14,
     flex: 1.5,
@@ -353,7 +355,7 @@ const styles = StyleSheet.create({
   },
   divider: {
     height: 1,
-    backgroundColor: palette.border,
+    backgroundColor: theme.border,
     marginVertical: 4,
   },
   totalRow: {
@@ -365,12 +367,12 @@ const styles = StyleSheet.create({
   totalLabel: {
     fontSize: 16,
     fontWeight: '700',
-    color: palette.muted,
+    color: theme.muted,
   },
   totalValue: {
     fontSize: 24,
     fontWeight: '900',
-    color: palette.primary,
+    color: theme.primary,
   },
 });
 

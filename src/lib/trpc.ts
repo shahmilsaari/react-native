@@ -5,7 +5,9 @@ import type { AnyRouter } from '@trpc/server';
 import { useAuthStore } from '@/store/authStore';
 import { getTrpcUrl } from '@/config/api';
 
-export const trpc = createTRPCReact<AnyRouter>() as any;
+import type { AppRouter } from '@/types/trpc';
+
+export const trpc = createTRPCReact<AppRouter>();
 
 const truthy = (value: string | undefined) => value === '1' || value?.toLowerCase() === 'true';
 

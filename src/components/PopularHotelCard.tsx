@@ -1,7 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, Pressable, ImageBackground } from 'react-native';
 import { Feather, FontAwesome } from '@expo/vector-icons';
-import palette from '@/theme/colors';
 import { ServiceListItem } from './ServiceCard';
 import { formatCurrency } from '@/utils/formatCurrency';
 

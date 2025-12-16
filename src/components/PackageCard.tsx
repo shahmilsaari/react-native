@@ -1,8 +1,8 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, StyleSheet, Pressable, ImageBackground } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 
-import palette from '@/theme/colors';
+import { useTheme } from '@/theme/ThemeContext';
 import { TravelPackage } from '@/types';
 import { formatCurrency } from '@/utils/formatCurrency';
 
@@ -12,6 +12,10 @@ type Props = {
 };
 
 const PackageCard = ({ data, onPress }: Props) => {
+  const { theme } = useTheme();
+  // We use static colors for text on image, but might need theme for interactive elements if any
+  const styles = useMemo(() => createStyles(theme), [theme]);
+
   const quickFacts = [
     { icon: 'users' as const, label: `${data.slotsAvailable} spots` },
     { icon: 'clock' as const, label: `${data.durationDays} days` },
@@ -27,7 +31,7 @@ const PackageCard = ({ data, onPress }: Props) => {
         </View>
         <View style={styles.content}>
           <View style={styles.badge}>
-            <Feather name="map-pin" size={12} color={palette.surface} />
+            <Feather name="map-pin" size={12} color="#fff" />
             <Text style={styles.badgeText}>{data.destination}</Text>
           </View>
           <Text style={styles.name}>{data.name}</Text>
@@ -38,7 +42,7 @@ const PackageCard = ({ data, onPress }: Props) => {
           <View style={styles.metaRow}>
             {quickFacts.map((fact) => (
               <View key={fact.icon} style={styles.metaItem}>
-                <Feather name={fact.icon} size={14} color={palette.surface} />
+                <Feather name={fact.icon} size={14} color="#fff" />
                 <Text style={styles.metaText}>{fact.label}</Text>
               </View>
             ))}
@@ -49,7 +53,7 @@ const PackageCard = ({ data, onPress }: Props) => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (theme: any) => StyleSheet.create({
   card: {
     borderRadius: 28,
     overflow: 'hidden',
@@ -58,7 +62,8 @@ const styles = StyleSheet.create({
     shadowColor: '#000',
     shadowOpacity: 0.2,
     shadowRadius: 18,
-    elevation: 6
+    elevation: 6,
+    backgroundColor: theme.surface // Fallback background
   },
   cover: {
     flex: 1
@@ -94,14 +99,14 @@ const styles = StyleSheet.create({
     gap: 6
   },
   badgeText: {
-    color: palette.surface,
+    color: '#fff',
     fontSize: 13,
     fontWeight: '600'
   },
   name: {
     fontSize: 22,
     fontWeight: '700',
-    color: palette.surface
+    color: '#fff'
   },
   priceLine: {
     marginTop: 2
@@ -112,7 +117,7 @@ const styles = StyleSheet.create({
     fontWeight: '700'
   },
   priceSuffix: {
-    color: palette.surface,
+    color: '#fff',
     fontSize: 14
   },
   metaRow: {
@@ -126,7 +131,7 @@ const styles = StyleSheet.create({
     gap: 6
   },
   metaText: {
-    color: palette.surface,
+    color: '#fff',
     fontSize: 13,
     fontWeight: '600'
   }

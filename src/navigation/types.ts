@@ -12,4 +12,6 @@ export type RootStackParamList = {
   BookingDetails: {
     bookingId: string;
   };
+  MyCalendar: undefined;
+  MyEventsList: undefined;
 };

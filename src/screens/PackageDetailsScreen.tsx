@@ -15,7 +15,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import { RootStackParamList } from '@/navigation/types';
 import { usePackagesStore } from '@/store/packagesStore';
-import palette from '@/theme/colors';
+import { useTheme } from '@/theme/ThemeContext';
 import { formatCurrency } from '@/utils/formatCurrency';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'PackageDetails'>;
@@ -30,6 +30,9 @@ const PackageDetailsScreen = ({ route, navigation }: Props) => {
     () => packages.find((item) => item.id === route.params.packageId),
     [packages, route.params.packageId]
   );
+
+  const { theme } = useTheme();
+  const styles = useMemo(() => createStyles(theme), [theme]);
 
   const [activeSlide, setActiveSlide] = useState(0);
   const viewabilityConfig = useRef({ viewAreaCoveragePercentThreshold: 60 }).current;
@@ -84,10 +87,10 @@ const PackageDetailsScreen = ({ route, navigation }: Props) => {
               <ImageBackground source={{ uri: item }} style={styles.slide} imageStyle={styles.slideImage}>
                 <View style={styles.sliderTop}>
                   <Pressable style={styles.circleButton} onPress={() => navigation.goBack()}>
-                    <Feather name="arrow-left" size={18} color={palette.primary} />
+                    <Feather name="arrow-left" size={18} color={theme.primary} />
                   </Pressable>
                   <Pressable style={styles.circleButton}>
-                    <Feather name="heart" size={18} color={palette.primary} />
+                    <Feather name="heart" size={18} color={theme.primary} />
                   </Pressable>
                 </View>
               </ImageBackground>
@@ -114,7 +117,7 @@ const PackageDetailsScreen = ({ route, navigation }: Props) => {
           <View>
             <Text style={styles.title}>{selectedPackage.name}</Text>
             <View style={styles.locationRow}>
-              <Feather name="map-pin" size={16} color={palette.muted} />
+              <Feather name="map-pin" size={16} color={theme.muted} />
               <Text style={styles.destination}>{selectedPackage.destination}</Text>
             </View>
           </View>
@@ -136,7 +139,7 @@ const PackageDetailsScreen = ({ route, navigation }: Props) => {
         <View style={styles.factRow}>
           {stayFacts.map((fact) => (
             <View key={fact.label} style={styles.factCard}>
-              <Feather name={fact.icon} size={18} color={palette.primary} />
+              <Feather name={fact.icon} size={18} color={theme.primary} />
               <Text style={styles.factLabel}>{fact.label}</Text>
               <Text style={styles.factValue}>{fact.value}</Text>
             </View>
@@ -153,7 +156,7 @@ const PackageDetailsScreen = ({ route, navigation }: Props) => {
           <View style={styles.amenitiesGrid}>
             {amenities.map((item) => (
               <View key={item.label} style={styles.amenityCard}>
-                <Feather name={item.icon} size={18} color={palette.primary} />
+                <Feather name={item.icon} size={18} color={theme.primary} />
                 <Text style={styles.amenityLabel}>{item.label}</Text>
               </View>
             ))}
@@ -164,7 +167,7 @@ const PackageDetailsScreen = ({ route, navigation }: Props) => {
           <Text style={styles.sectionTitle}>Highlights</Text>
           {selectedPackage.highlights.map((highlight) => (
             <View key={highlight} style={styles.highlightRow}>
-              <Feather name="check-circle" color={palette.secondary} size={18} />
+              <Feather name="check-circle" color={theme.secondary} size={18} />
               <Text style={styles.highlightText}>{highlight}</Text>
             </View>
           ))}
@@ -184,10 +187,10 @@ const PackageDetailsScreen = ({ route, navigation }: Props) => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (theme: any) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: palette.background
+    backgroundColor: theme.background
   },
   content: {
     paddingBottom: 140
@@ -266,7 +269,7 @@ const styles = StyleSheet.create({
   },
   activeDot: {
     width: 18,
-    backgroundColor: palette.surface
+    backgroundColor: '#fff'
   },
   header: {
     flexDirection: 'row',
@@ -279,7 +282,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 26,
     fontWeight: '700',
-    color: palette.primary
+    color: theme.primary
   },
   locationRow: {
     flexDirection: 'row',
@@ -288,7 +291,7 @@ const styles = StyleSheet.create({
     gap: 6
   },
   destination: {
-    color: palette.muted,
+    color: theme.muted,
     fontSize: 15
   },
   priceWrapper: {
@@ -297,10 +300,10 @@ const styles = StyleSheet.create({
   price: {
     fontSize: 28,
     fontWeight: '700',
-    color: palette.primary
+    color: theme.primary
   },
   priceHint: {
-    color: palette.muted,
+    color: theme.muted,
     fontSize: 12
   },
   ratingRow: {
@@ -311,13 +314,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    backgroundColor: palette.surface,
+    backgroundColor: theme.surface,
     borderRadius: 999,
     paddingVertical: 10,
     paddingHorizontal: 16
   },
   ratingText: {
-    color: palette.primary,
+    color: theme.primary,
     fontWeight: '600'
   },
   factRow: {
@@ -328,23 +331,23 @@ const styles = StyleSheet.create({
   },
   factCard: {
     flex: 1,
-    backgroundColor: palette.surface,
+    backgroundColor: theme.surface,
     borderRadius: 18,
     padding: 16,
     gap: 6,
     borderWidth: 1,
-    borderColor: palette.border
+    borderColor: theme.border
   },
   factLabel: {
     fontSize: 12,
     textTransform: 'uppercase',
-    color: palette.muted,
+    color: theme.muted,
     letterSpacing: 0.5
   },
   factValue: {
     fontSize: 15,
     fontWeight: '600',
-    color: palette.primary
+    color: theme.primary
   },
   section: {
     paddingHorizontal: 24,
@@ -354,11 +357,11 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 20,
     fontWeight: '700',
-    color: palette.primary
+    color: theme.primary
   },
   description: {
     lineHeight: 22,
-    color: palette.text
+    color: theme.text
   },
   amenitiesGrid: {
     flexDirection: 'row',
@@ -369,14 +372,14 @@ const styles = StyleSheet.create({
     width: '48%',
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: palette.border,
+    borderColor: theme.border,
     padding: 14,
     gap: 8,
-    backgroundColor: palette.surface
+    backgroundColor: theme.surface
   },
   amenityLabel: {
     fontSize: 13,
-    color: palette.primary
+    color: theme.primary
   },
   highlightRow: {
     flexDirection: 'row',
@@ -385,7 +388,7 @@ const styles = StyleSheet.create({
   },
   highlightText: {
     flex: 1,
-    color: palette.text,
+    color: theme.text,
     lineHeight: 20
   },
   ctaBar: {
@@ -398,18 +401,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 24,
     paddingVertical: 20,
-    backgroundColor: palette.surface,
+    backgroundColor: theme.surface,
     borderTopWidth: 1,
-    borderColor: palette.border
+    borderColor: theme.border
   },
   ctaLabel: {
-    color: palette.muted,
+    color: theme.muted,
     fontSize: 13
   },
   ctaPrice: {
     fontSize: 20,
     fontWeight: '700',
-    color: palette.primary
+    color: theme.primary
   },
   bookButton: {
     backgroundColor: '#D8F84F',
@@ -420,16 +423,16 @@ const styles = StyleSheet.create({
   bookText: {
     fontSize: 16,
     fontWeight: '700',
-    color: palette.primary
+    color: theme.primary
   },
   fallback: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: palette.background
+    backgroundColor: theme.background
   },
   fallbackText: {
-    color: palette.muted
+    color: theme.muted
   }
 });
 

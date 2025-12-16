@@ -7,8 +7,8 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 import AppNavigator from '@/navigation/AppNavigator';
-import palette from '@/theme/colors';
 import { trpc, createTrpcClient } from '@/lib/trpc';
+import { ThemeProvider } from '@/theme/ThemeContext';
 
 const queryClient = new QueryClient();
 
@@ -17,14 +17,16 @@ export default function App() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <trpc.Provider client={trpcClient} queryClient={queryClient}>
-        <GestureHandlerRootView style={{ flex: 1, backgroundColor: palette.background }}>
-          <SafeAreaProvider>
-            <StatusBar style="dark" />
-            <AppNavigator />
-          </SafeAreaProvider>
-        </GestureHandlerRootView>
-      </trpc.Provider>
+      <ThemeProvider>
+        <trpc.Provider client={trpcClient} queryClient={queryClient}>
+          <GestureHandlerRootView style={{ flex: 1 }}>
+            <SafeAreaProvider>
+              <StatusBar style="auto" />
+              <AppNavigator />
+            </SafeAreaProvider>
+          </GestureHandlerRootView>
+        </trpc.Provider>
+      </ThemeProvider>
     </QueryClientProvider>
   );
 }

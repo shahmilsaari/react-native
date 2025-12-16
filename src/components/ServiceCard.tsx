@@ -1,8 +1,8 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, StyleSheet, Pressable, ImageBackground } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 
-import palette from '@/theme/colors';
+import { useTheme } from '@/theme/ThemeContext';
 import { formatCurrency } from '@/utils/formatCurrency';
 
 export type ServiceListItem = {
@@ -31,6 +31,8 @@ const getLocationLabel = (item: ServiceListItem) => {
 };
 
 const ServiceCard = ({ data, onPress }: Props) => {
+  const { theme } = useTheme();
+  const styles = useMemo(() => createStyles(theme), [theme]);
   const image = data.images?.[0];
   const locationLabel = getLocationLabel(data);
 
@@ -64,7 +66,7 @@ const ServiceCard = ({ data, onPress }: Props) => {
           </Text>
           {data.vendorCompany ? (
             <View style={styles.metaLine}>
-              <Feather name="briefcase" size={14} color={palette.surface} />
+              <Feather name="briefcase" size={14} color="#fff" />
               <Text style={styles.metaText} numberOfLines={1}>
                 {data.vendorCompany}
               </Text>
@@ -72,7 +74,7 @@ const ServiceCard = ({ data, onPress }: Props) => {
           ) : null}
           {locationLabel ? (
             <View style={styles.metaLine}>
-              <Feather name="map-pin" size={14} color={palette.surface} />
+              <Feather name="map-pin" size={14} color="#fff" />
               <Text style={styles.metaText} numberOfLines={1}>
                 {locationLabel}
               </Text>
@@ -86,7 +88,7 @@ const ServiceCard = ({ data, onPress }: Props) => {
             </View>
             <View style={styles.cta}>
               <Text style={styles.ctaText}>View</Text>
-              <Feather name="arrow-up-right" size={16} color={palette.primary} />
+              <Feather name="arrow-up-right" size={16} color={theme.primary} />
             </View>
           </View>
         </View>
@@ -95,7 +97,7 @@ const ServiceCard = ({ data, onPress }: Props) => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (theme: any) => StyleSheet.create({
   card: {
     borderRadius: 28,
     overflow: 'hidden',
@@ -104,11 +106,12 @@ const styles = StyleSheet.create({
     shadowColor: '#000',
     shadowOpacity: 0.2,
     shadowRadius: 18,
-    elevation: 6
+    elevation: 6,
+    backgroundColor: theme.surface // Fallback
   },
   cover: {
     flex: 1,
-    backgroundColor: '#EDEFF5'
+    backgroundColor: theme.surfaceHighlight // Fallback
   },
   coverImage: {
     borderRadius: 28
@@ -131,7 +134,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.92)'
   },
   pillText: {
-    color: palette.primary,
+    color: theme.primary,
     fontWeight: '900',
     fontSize: 12
   },
@@ -152,7 +155,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 22,
     fontWeight: '900',
-    color: palette.surface
+    color: '#fff'
   },
   metaLine: {
     flexDirection: 'row',
@@ -160,7 +163,7 @@ const styles = StyleSheet.create({
     gap: 8
   },
   metaText: {
-    color: palette.surface,
+    color: '#fff',
     fontSize: 13,
     fontWeight: '700',
     opacity: 0.95,
@@ -178,7 +181,7 @@ const styles = StyleSheet.create({
     fontWeight: '900'
   },
   priceHint: {
-    color: palette.surface,
+    color: '#fff',
     opacity: 0.9,
     fontSize: 12,
     fontWeight: '700',
@@ -194,7 +197,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14
   },
   ctaText: {
-    color: palette.primary,
+    color: theme.primary,
     fontWeight: '900'
   }
 });

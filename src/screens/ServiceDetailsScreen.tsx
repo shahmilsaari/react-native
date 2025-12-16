@@ -16,13 +16,13 @@ import {
   Platform
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Feather, Ionicons, FontAwesome } from '@expo/vector-icons';
+import { Feather, Ionicons, FontAwesome, FontAwesome5 } from '@expo/vector-icons';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import { formatCurrency } from '@/utils/formatCurrency';
 import { trpc } from '@/lib/trpc';
 import { RootStackParamList } from '@/navigation/types';
-import palette from '@/theme/colors';
+import { useTheme } from '@/theme/ThemeContext';
 import FacilityItem, { FacilityType } from '@/components/FacilityItem';
 import { getServiceImages } from '@/lib/serviceImages';
 import { useAuthStore } from '@/store/authStore';
@@ -53,6 +53,7 @@ type ServiceItem = {
 type AvailabilityItem = {
   date: string;
   available: boolean;
+  windows?: { startAt: string; endAt: string }[];
 };
 
 // Mock data for new fields
@@ -153,6 +154,9 @@ const timeSlots: Array<{ id: string; label: string; startHm: string; durationMin
 const ServiceDetailsScreen = ({ route, navigation }: Props) => {
   const serviceId = route.params.serviceId;
   const insets = useSafeAreaInsets();
+  const { theme } = useTheme();
+  const styles = useMemo(() => createStyles(theme), [theme]);
+
   const query = trpc.services.getServices.useQuery(undefined, { retry: 1 });
   const user = useAuthStore((state) => state.user);
   const availability = trpc.services.availabilityCalendar.useMutation();
@@ -168,9 +172,42 @@ const ServiceDetailsScreen = ({ route, navigation }: Props) => {
   const [eventTab, setEventTab] = useState<'select' | 'create'>('select');
   const myEvents = trpc.events.my.useQuery(undefined, { enabled: eventModalOpen && eventTab === 'select' });
 
+  const eventItems = useMemo(() => {
+    const raw = myEvents.data as any;
+    const list =
+      (Array.isArray(raw) && raw) ||
+      (Array.isArray(raw?.data) && raw.data) ||
+      (Array.isArray(raw?.data?.data) && raw.data.data) ||
+      (Array.isArray(raw?.items) && raw.items) ||
+      (Array.isArray(raw?.data?.items) && raw.data.items) ||
+      [];
+    return list as any[];
+  }, [myEvents.data]);
+
+  const toSelectableEvent = (item: any): Event | null => {
+    const id = item?.id ?? item?._id ?? item?.eventId ?? item?.event_id;
+    if (!id) return null;
+    return {
+      id: String(id),
+      name: String(item?.name ?? item?.eventName ?? 'Untitled event'),
+      eventDate: String(item?.eventDate ?? item?.event_date ?? item?.date ?? new Date().toISOString()),
+      location: item?.location ? String(item.location) : undefined,
+      isActive: item?.isActive == null ? true : Boolean(item.isActive),
+    };
+  };
+
+  useEffect(() => {
+    if (!eventModalOpen || eventTab !== 'select') return;
+    myEvents.refetch?.();
+  }, [eventModalOpen, eventTab]);
+
   // New Event Form State
   const [newEventName, setNewEventName] = useState('');
-  const [newEventDate, setNewEventDate] = useState(new Date().toISOString().split('T')[0]); // simplified YYYY-MM-DD
+  const [newEventDate, setNewEventDate] = useState(() => {
+    const now = new Date();
+    const offset = now.getTimezoneOffset() * 60000;
+    return new Date(now.getTime() - offset).toISOString().split('T')[0]; // Local YYYY-MM-DD
+  });
   const [newEventLocation, setNewEventLocation] = useState('Kuala Lumpur'); // Default to KL as per request
 
   // Booking Modal State
@@ -178,7 +215,7 @@ const ServiceDetailsScreen = ({ route, navigation }: Props) => {
   const [bookingEventName, setBookingEventName] = useState(''); // Just for display if needed, but we use selectedEvent
   const [selectedDate, setSelectedDate] = useState<string | undefined>(undefined);
   const [selectedSlotId, setSelectedSlotId] = useState<string>(timeSlots[0]?.id ?? 'morning');
-  const [calendarMonth, setCalendarMonth] = useState<Date>(() => startOfMonth(new Date()));
+  // const [calendarMonth, setCalendarMonth] = useState<Date>(() => startOfMonth(new Date())); // No longer needed
   const timeZone = useMemo(() => process.env.EXPO_PUBLIC_TIME_ZONE ?? 'Asia/Kuala_Lumpur', []);
 
   const [activeSlide, setActiveSlide] = useState(0);
@@ -206,24 +243,27 @@ const ServiceDetailsScreen = ({ route, navigation }: Props) => {
       : ['https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=1200&q=80'];
   }, [service]);
 
-  // When selectedEvent changes, sync calendar
+  // When selectedEvent changes, set selectedDate
   useEffect(() => {
     if (selectedEvent && selectedEvent.eventDate) {
-      // Parse the event date (assuming ISO)
       const d = new Date(selectedEvent.eventDate);
       if (!Number.isNaN(d.getTime())) {
         const ymd = toYmdLocal(d);
         setSelectedDate(ymd);
-        setCalendarMonth(startOfMonth(d));
       }
     }
   }, [selectedEvent]);
 
   const activeRange = useMemo(() => {
-    const from = toYmdLocal(startOfMonth(calendarMonth));
-    const to = toYmdLocal(endOfMonth(calendarMonth));
+    const now = new Date();
+    // Start from today
+    const from = toYmdLocal(now);
+    // End 30 days from now
+    const toDate = new Date(now);
+    toDate.setDate(now.getDate() + 30);
+    const to = toYmdLocal(toDate);
     return { fromDate: from, toDate: to };
-  }, [calendarMonth]);
+  }, []);
 
   const availabilityDays = useMemo(() => {
     const raw = availability.data as any;
@@ -232,8 +272,8 @@ const ServiceDetailsScreen = ({ route, navigation }: Props) => {
   }, [availability.data]);
 
   const availabilityByDate = useMemo(() => {
-    const map = new Map<string, boolean>();
-    availabilityDays.forEach((item) => map.set(item.date, Boolean(item.available)));
+    const map = new Map<string, typeof availabilityDays[0]>();
+    availabilityDays.forEach((item) => map.set(item.date, item));
     return map;
   }, [availabilityDays]);
 
@@ -275,6 +315,7 @@ const ServiceDetailsScreen = ({ route, navigation }: Props) => {
 
       const created = res?.data ?? res; // handle trpc response wrapper if any
       if (created) {
+        await trpcUtils?.events?.my?.invalidate?.();
         const evt: Event = {
           id: created.id,
           name: created.name,
@@ -288,7 +329,7 @@ const ServiceDetailsScreen = ({ route, navigation }: Props) => {
         // Use this new date
         const d = new Date(evt.eventDate);
         setSelectedDate(toYmdLocal(d));
-        setCalendarMonth(startOfMonth(d));
+        setSelectedDate(toYmdLocal(d));
       }
     } catch (e: any) {
       Alert.alert('Error', e?.message ?? 'Failed to create event');
@@ -323,14 +364,17 @@ const ServiceDetailsScreen = ({ route, navigation }: Props) => {
       return;
     }
 
-    const slot = timeSlots.find((s) => s.id === selectedSlotId) ?? timeSlots[0];
-    if (!slot) {
-      Alert.alert('Select time', 'Please select a time slot.');
+    // Dynamic Slot Logic
+    const availability = availabilityByDate.get(selectedDate);
+    const window = availability?.windows?.find((w) => w.startAt === selectedSlotId);
+
+    if (!window) {
+      Alert.alert('Select time', 'Please select a valid time slot.');
       return;
     }
 
-    const startAt = zonedWallTimeToUtcIso(selectedDate, slot.startHm, timeZone);
-    const endAt = addMinutesIso(startAt, slot.durationMinutes);
+    const startAt = window.startAt;
+    const endAt = window.endAt;
 
     try {
       // Create Booking directly linked to existing event
@@ -371,7 +415,7 @@ const ServiceDetailsScreen = ({ route, navigation }: Props) => {
   if (query.isLoading) {
     return (
       <View style={[styles.container, styles.center]}>
-        <ActivityIndicator size="small" color={palette.primary} />
+        <ActivityIndicator size="small" color={theme.primary} />
       </View>
     );
   }
@@ -420,7 +464,7 @@ const ServiceDetailsScreen = ({ route, navigation }: Props) => {
             </Pressable>
             <View style={styles.headerRight}>
               <Pressable style={styles.circleButton}>
-                <FontAwesome name="heart" size={18} color={palette.muted} />
+                <FontAwesome name="heart" size={18} color={theme.muted} />
               </Pressable>
             </View>
           </View>
@@ -439,7 +483,7 @@ const ServiceDetailsScreen = ({ route, navigation }: Props) => {
             <View style={styles.contextPill}>
               <Text style={styles.contextLabel}>Planning for:</Text>
               <View style={styles.contextValueRow}>
-                <FontAwesome5 name="glass-cheers" size={12} color={palette.primary} />
+                <FontAwesome5 name="glass-cheers" size={12} color={theme.primary} />
                 <Text style={styles.contextValue}>{selectedEvent.name}</Text>
               </View>
               <Pressable onPress={() => setEventModalOpen(true)}>
@@ -451,7 +495,7 @@ const ServiceDetailsScreen = ({ route, navigation }: Props) => {
           <Text style={styles.title}>{service.name ?? 'Luxury Hotel'}</Text>
 
           <View style={styles.locationRow}>
-            <Ionicons name="location-outline" size={16} color={palette.muted} />
+            <Ionicons name="location-outline" size={16} color={theme.muted} />
             <Text style={styles.locationText}>{locationLabel}</Text>
             <View style={styles.ratingContainer}>
               <FontAwesome name="star" size={12} color="#FACC15" />
@@ -463,15 +507,15 @@ const ServiceDetailsScreen = ({ route, navigation }: Props) => {
           {/* Metrics */}
           <View style={styles.metricsRow}>
             <View style={styles.metricItem}>
-              <Ionicons name="people-outline" size={18} color={palette.muted} />
+              <Ionicons name="people-outline" size={18} color={theme.muted} />
               <Text style={styles.metricText}>4 Guests</Text>
             </View>
             <View style={styles.metricItem}>
-              <Ionicons name="bed-outline" size={18} color={palette.muted} />
+              <Ionicons name="bed-outline" size={18} color={theme.muted} />
               <Text style={styles.metricText}>2 Beds</Text>
             </View>
             <View style={styles.metricItem}>
-              <Ionicons name="water-outline" size={18} color={palette.muted} />
+              <Ionicons name="water-outline" size={18} color={theme.muted} />
               <Text style={styles.metricText}>2 Baths</Text>
             </View>
           </View>
@@ -523,7 +567,7 @@ const ServiceDetailsScreen = ({ route, navigation }: Props) => {
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>Select Event</Text>
             <Pressable style={styles.modalClose} onPress={() => setEventModalOpen(false)}>
-              <Feather name="x" size={18} color={palette.primary} />
+              <Feather name="x" size={18} color={theme.primary} />
             </Pressable>
           </View>
 
@@ -545,30 +589,37 @@ const ServiceDetailsScreen = ({ route, navigation }: Props) => {
           {eventTab === 'select' ? (
             <View style={styles.eventListContainer}>
               {myEvents.isLoading ? (
-                <ActivityIndicator color={palette.primary} />
+                <ActivityIndicator color={theme.primary} />
+              ) : myEvents.isError ? (
+                <Text style={styles.emptyText}>Failed to load events.</Text>
               ) : (
                 <FlatList
-                  data={(myEvents.data as any)?.data ?? []}
-                  keyExtractor={(item) => item.id}
+                  data={eventItems}
+                  keyExtractor={(item, index) => String(item?.id ?? item?._id ?? item?.eventId ?? item?.event_id ?? index)}
                   renderItem={({ item }) => (
                     <Pressable
                       style={styles.eventItem}
                       onPress={() => {
-                        setSelectedEvent(item);
+                        const evt = toSelectableEvent(item);
+                        if (!evt) {
+                          Alert.alert('Invalid event', 'This event is missing an id and cannot be selected.');
+                          return;
+                        }
+                        setSelectedEvent(evt);
                         setEventModalOpen(false);
                         setBookingModalOpen(true); // Auto proceed
                       }}
                     >
                       <View style={styles.eventIcon}>
-                        <FontAwesome5 name="glass-cheers" size={14} color={palette.primary} />
+                        <FontAwesome5 name="glass-cheers" size={14} color={theme.primary} />
                       </View>
                       <View style={{ flex: 1 }}>
-                        <Text style={styles.eventName}>{item.name}</Text>
+                        <Text style={styles.eventName}>{item?.name ?? item?.eventName ?? 'Untitled event'}</Text>
                         <Text style={styles.eventDate}>
-                          {new Date(item.eventDate).toLocaleDateString()} · {item.location}
+                          {new Date(item?.eventDate ?? item?.event_date ?? item?.date ?? Date.now()).toLocaleDateString()} · {item?.location ?? ''}
                         </Text>
                       </View>
-                      <Feather name="chevron-right" size={18} color={palette.muted} />
+                      <Feather name="chevron-right" size={18} color={theme.muted} />
                     </Pressable>
                   )}
                   ListEmptyComponent={<Text style={styles.emptyText}>No events found.</Text>}
@@ -581,13 +632,15 @@ const ServiceDetailsScreen = ({ route, navigation }: Props) => {
               <TextInput
                 style={styles.input}
                 placeholder="e.g. Birthday Party"
+                placeholderTextColor={theme.muted}
                 value={newEventName}
                 onChangeText={setNewEventName}
               />
               <Text style={styles.label}>Date (YYYY-MM-DD)</Text>
               <TextInput
                 style={styles.input}
-                placeholder="2025-12-20"
+                placeholder="YYYY-MM-DD"
+                placeholderTextColor={theme.muted}
                 value={newEventDate}
                 onChangeText={setNewEventDate}
               />
@@ -595,6 +648,8 @@ const ServiceDetailsScreen = ({ route, navigation }: Props) => {
               <TextInput
                 style={styles.input}
                 value={newEventLocation}
+                placeholder="e.g. Kuala Lumpur"
+                placeholderTextColor={theme.muted}
                 onChangeText={setNewEventLocation}
               />
               <Pressable style={styles.createBtn} onPress={submitCreateEvent}>
@@ -616,83 +671,91 @@ const ServiceDetailsScreen = ({ route, navigation }: Props) => {
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>Confirm Booking</Text>
             <Pressable style={styles.modalClose} onPress={() => setBookingModalOpen(false)}>
-              <Feather name="x" size={18} color={palette.primary} />
+              <Feather name="x" size={18} color={theme.primary} />
             </Pressable>
           </View>
 
           <Text style={styles.modalSubtitle}>
-            Booking for <Text style={{ fontWeight: '900', color: palette.primary }}>{selectedEvent?.name}</Text>
+            Booking for <Text style={{ fontWeight: '900', color: theme.primary }}>{selectedEvent?.name}</Text>
           </Text>
 
-          <View style={styles.monthHeader}>
-            <Pressable onClick={() => {/* Disable browsing if locked to event? User might want to browse. keeping enabled */
-              const prev = addMonths(calendarMonth, -1);
-              setCalendarMonth(prev);
-            }} style={styles.monthNav}>
-              <Feather name="chevron-left" size={18} color={palette.primary} />
-            </Pressable>
-            <Text style={styles.monthTitle}>{monthLabel(calendarMonth)}</Text>
-            <Pressable onClick={() => {
-              const next = addMonths(calendarMonth, 1);
-              setCalendarMonth(next);
-            }} style={styles.monthNav}>
-              <Feather name="chevron-right" size={18} color={palette.primary} />
-            </Pressable>
-          </View>
-
-          <View style={styles.calendarGrid}>
-            {/* ... simplified calendar logic (just day numbers for brevity implementation in this rewrite) ... */}
-            {/* Note: I am rewriting this file, so I strictly need to put the calendar rendering code back */}
-            {(() => {
-              const first = startOfMonth(calendarMonth);
-              const startOffset = first.getDay();
-              const daysInMonth = endOfMonth(calendarMonth).getDate();
-              const cells = [];
-              for (let i = 0; i < startOffset; i++) cells.push({ key: `pad-${i}` });
-              for (let day = 1; day <= daysInMonth; day++) {
-                const d = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth(), day);
-                cells.push({ date: d, key: `day-${day}` });
-              }
-              while (cells.length % 7 !== 0) cells.push({ key: `pad-end-${cells.length}` });
-
-              return cells.map((cell) => {
-                if (!cell.date) return <View key={cell.key} style={styles.dayCell} />;
-                const ymd = toYmdLocal(cell.date);
+          <View style={{ marginBottom: 20 }}>
+            {/* Horizontal list of next 30 days starting from Today */}
+            <FlatList
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{ gap: 10, paddingHorizontal: 4 }}
+              data={(() => {
+                const now = new Date();
+                return Array.from({ length: 30 }).map((_, i) => {
+                  const d = new Date(now);
+                  d.setDate(now.getDate() + i);
+                  return d;
+                });
+              })()}
+              keyExtractor={(item) => item.toISOString()}
+              renderItem={({ item }) => {
+                const ymd = toYmdLocal(item);
                 const isSelected = selectedDate === ymd;
-                const isAvailable = availabilityByDate.get(ymd); // true/false/undefined
-                // If selectedEvent is set, we might highlight that specific day strongly.
-                const isEventDay = selectedEvent && toYmdLocal(new Date(selectedEvent.eventDate)) === ymd;
+                const isAvailable = availabilityByDate.get(ymd); // keeping this for data check
+                const dayName = item.toLocaleDateString('en-US', { weekday: 'short' });
+                const dayNum = item.getDate();
+
+                // Calculate today local YYYY-MM-DD
+                const now = new Date();
+                const offset = now.getTimezoneOffset() * 60000;
+                const todayYmd = new Date(now.getTime() - offset).toISOString().split('T')[0];
+
+                const isPast = ymd < todayYmd;
 
                 return (
                   <Pressable
-                    key={cell.key}
                     style={[
-                      styles.dayCell,
-                      isSelected && styles.dayCellSelected,
-                      isEventDay && !isSelected && { borderColor: palette.secondary, borderWidth: 1 }
+                      styles.dayStripItem,
+                      isSelected && styles.dayStripItemSelected,
+                      isPast && { opacity: 0.3, backgroundColor: theme.surfaceHighlight }
                     ]}
-                    onPress={() => setSelectedDate(ymd)}
+                    onPress={() => !isPast && setSelectedDate(ymd)}
+                    disabled={isPast}
                   >
-                    <Text style={[styles.dayNumber, !isAvailable && styles.dayNumberDisabled]}>{cell.date.getDate()}</Text>
-                    {isAvailable && <View style={styles.dayDotOn} />}
+                    <Text style={[styles.dayStripName, isSelected && styles.dayStripNameSelected, isPast && { color: theme.muted }]}>{dayName}</Text>
+                    <View style={[styles.dayStripNumberContainer, isSelected && styles.dayStripNumberContainerSelected, isPast && { backgroundColor: 'transparent' }]}>
+                      <Text style={[styles.dayStripNumber, isSelected && styles.dayStripNumberSelected, isPast && { color: theme.muted }]}>{dayNum}</Text>
+                    </View>
                   </Pressable>
                 );
-              });
-            })()}
+              }}
+            />
           </View>
 
           <View style={styles.modalField}>
             <Text style={styles.modalLabel}>Time slot</Text>
             <View style={styles.slotRow}>
-              {timeSlots.map((slot) => (
-                <Pressable
-                  key={slot.id}
-                  style={[styles.slotChip, selectedSlotId === slot.id && styles.slotChipActive]}
-                  onPress={() => setSelectedSlotId(slot.id)}
-                >
-                  <Text style={[styles.slotChipText, selectedSlotId === slot.id && styles.slotChipTextActive]}>{slot.label}</Text>
-                </Pressable>
-              ))}
+              <View style={styles.slotRow}>
+                {(() => {
+                  const availability = selectedDate ? availabilityByDate.get(selectedDate) : undefined;
+                  const windows = availability?.windows || [];
+
+                  if (!selectedDate) return <Text style={{ color: theme.muted }}>Select a date first</Text>;
+                  if (windows.length === 0) return <Text style={{ color: theme.muted }}>No slots available</Text>;
+
+                  return windows.map((win, index) => {
+                    const label = `${new Date(win.startAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })} - ${new Date(win.endAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })}`;
+                    const id = win.startAt;
+                    const isSelected = selectedSlotId === id;
+
+                    return (
+                      <Pressable
+                        key={index}
+                        style={[styles.slotChip, isSelected && styles.slotChipActive]}
+                        onPress={() => setSelectedSlotId(id)}
+                      >
+                        <Text style={[styles.slotChipText, isSelected && styles.slotChipTextActive]}>{label}</Text>
+                      </Pressable>
+                    );
+                  });
+                })()}
+              </View>
             </View>
           </View>
 
@@ -712,10 +775,10 @@ const ServiceDetailsScreen = ({ route, navigation }: Props) => {
 };
 
 // Styles
-const styles = StyleSheet.create({
+const createStyles = (theme: any) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: theme.background,
   },
   center: {
     justifyContent: 'center',
@@ -766,7 +829,7 @@ const styles = StyleSheet.create({
   },
   dotActive: {
     width: 32,
-    backgroundColor: '#fff',
+    backgroundColor: theme.background,
   },
   dotInactive: {
     width: 8,
@@ -777,7 +840,7 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 30,
     borderTopRightRadius: 30,
     marginTop: -30,
-    backgroundColor: '#fff',
+    backgroundColor: theme.background,
   },
   contextPill: {
     flexDirection: 'row',
@@ -791,7 +854,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   contextLabel: {
-    color: palette.muted,
+    color: theme.muted,
     fontSize: 12,
     fontWeight: '600',
   },
@@ -803,17 +866,17 @@ const styles = StyleSheet.create({
   },
   contextValue: {
     fontWeight: '700',
-    color: palette.primary,
+    color: theme.primary,
   },
   contextEdit: {
-    color: palette.secondary,
+    color: theme.secondary,
     fontWeight: '700',
     fontSize: 12,
   },
   title: {
     fontSize: 24,
     fontWeight: '700',
-    color: palette.text,
+    color: theme.text,
     marginBottom: 8,
   },
   locationRow: {
@@ -823,7 +886,7 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   locationText: {
-    color: palette.muted,
+    color: theme.muted,
     fontSize: 14,
     marginRight: 12,
   },
@@ -834,10 +897,10 @@ const styles = StyleSheet.create({
   },
   ratingValue: {
     fontWeight: '700',
-    color: palette.text,
+    color: theme.text,
   },
   reviewCount: {
-    color: palette.muted,
+    color: theme.muted,
     fontSize: 14,
   },
   metricsRow: {
@@ -851,7 +914,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   metricText: {
-    color: palette.muted,
+    color: theme.muted,
     fontSize: 13,
   },
   section: {
@@ -866,20 +929,20 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: palette.text,
+    color: theme.text,
     marginBottom: 8,
   },
   descriptionText: {
-    color: palette.muted,
+    color: theme.muted,
     lineHeight: 22,
     fontSize: 14,
   },
   readMore: {
-    color: palette.primary,
+    color: theme.primary,
     fontWeight: '600',
   },
   seeAll: {
-    color: palette.primary,
+    color: theme.primary,
     fontSize: 14,
     fontWeight: '600',
   },
@@ -892,9 +955,9 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: '#fff',
+    backgroundColor: theme.background,
     borderTopWidth: 1,
-    borderTopColor: palette.border,
+    borderTopColor: theme.border,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
@@ -909,15 +972,15 @@ const styles = StyleSheet.create({
   price: {
     fontSize: 24,
     fontWeight: '800',
-    color: palette.text,
+    color: theme.text,
   },
   perNight: {
-    color: palette.muted,
+    color: theme.muted,
     fontSize: 12,
     fontWeight: '600',
   },
   bookButton: {
-    backgroundColor: palette.primary,
+    backgroundColor: theme.primary,
     paddingVertical: 14,
     paddingHorizontal: 32,
     borderRadius: 999,
@@ -932,11 +995,11 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(16,24,40,0.35)',
   },
   modalSheet: {
-    backgroundColor: palette.background,
+    backgroundColor: theme.surface, // Solid/Glass surface instead of transparent background
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     borderWidth: 1,
-    borderColor: palette.border,
+    borderColor: theme.border,
     paddingHorizontal: 18,
     paddingTop: 14,
     paddingBottom: 28,
@@ -951,11 +1014,11 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 16,
     fontWeight: '900',
-    color: palette.primary,
+    color: theme.primary,
   },
   modalSubtitle: {
     fontSize: 14,
-    color: palette.muted,
+    color: theme.muted,
     marginBottom: 10,
   },
   modalClose: {
@@ -963,8 +1026,8 @@ const styles = StyleSheet.create({
     height: 36,
     borderRadius: 18,
     borderWidth: 1,
-    borderColor: palette.border,
-    backgroundColor: palette.surface,
+    borderColor: theme.border,
+    backgroundColor: theme.surface,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -972,7 +1035,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     marginBottom: 20,
     borderBottomWidth: 1,
-    borderColor: palette.border,
+    borderColor: theme.border,
   },
   tab: {
     flex: 1,
@@ -982,14 +1045,14 @@ const styles = StyleSheet.create({
     borderBottomColor: 'transparent',
   },
   tabActive: {
-    borderBottomColor: palette.primary,
+    borderBottomColor: theme.primary,
   },
   tabText: {
     fontWeight: '600',
-    color: palette.muted,
+    color: theme.muted,
   },
   tabTextActive: {
-    color: palette.primary,
+    color: theme.primary,
     fontWeight: '700',
   },
   eventListContainer: {
@@ -1001,7 +1064,7 @@ const styles = StyleSheet.create({
     gap: 12,
     paddingVertical: 14,
     borderBottomWidth: 1,
-    borderBottomColor: palette.border,
+    borderBottomColor: theme.border,
   },
   eventIcon: {
     width: 40,
@@ -1013,16 +1076,16 @@ const styles = StyleSheet.create({
   },
   eventName: {
     fontWeight: '700',
-    color: palette.text,
+    color: theme.text,
   },
   eventDate: {
     fontSize: 12,
-    color: palette.muted,
+    color: theme.muted,
   },
   emptyText: {
     textAlign: 'center',
     marginTop: 20,
-    color: palette.muted,
+    color: theme.muted,
   },
   createForm: {
     gap: 12,
@@ -1030,18 +1093,18 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 12,
     fontWeight: '700',
-    color: palette.text,
+    color: theme.text,
     textTransform: 'uppercase',
   },
   input: {
     borderWidth: 1,
-    borderColor: palette.border,
+    borderColor: theme.border,
     borderRadius: 12,
     paddingHorizontal: 16,
     height: 48,
   },
   createBtn: {
-    backgroundColor: palette.primary,
+    backgroundColor: theme.primary,
     borderRadius: 12,
     height: 48,
     alignItems: 'center',
@@ -1057,7 +1120,7 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   modalLabel: {
-    color: palette.muted,
+    color: theme.muted,
     fontWeight: '900',
     fontSize: 12,
     textTransform: 'uppercase',
@@ -1076,15 +1139,15 @@ const styles = StyleSheet.create({
     height: 40,
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: palette.border,
-    backgroundColor: palette.surface,
+    borderColor: theme.border,
+    backgroundColor: theme.surface,
     alignItems: 'center',
     justifyContent: 'center',
   },
   monthTitle: {
     textAlign: 'center',
     fontWeight: '900',
-    color: palette.primary,
+    color: theme.primary,
   },
   calendarGrid: {
     flexDirection: 'row',
@@ -1099,23 +1162,67 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   dayCellSelected: {
-    backgroundColor: '#EEF2FF',
+    backgroundColor: theme.surfaceHighlight || '#333', // Theme aware instead of hardcoded light
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: palette.primary,
+    borderColor: theme.primary,
   },
   dayNumber: {
     fontWeight: '900',
-    color: palette.primary,
+    color: theme.primary,
   },
   dayNumberDisabled: {
     color: '#E0E0E0',
+  },
+  // New Horizontal Date Strip Styles
+  dayStripItem: {
+    width: 50,
+    height: 80,
+    borderRadius: 25,
+    backgroundColor: theme.surfaceHighlight, // Unselected background (Charcoal/Gray)
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    borderWidth: 1,
+    borderColor: 'transparent',
+  },
+  dayStripItemSelected: {
+    backgroundColor: theme.primary, // Selected background (Gold)
+    borderColor: theme.primary,
+  },
+  dayStripName: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: theme.muted,
+  },
+  dayStripNameSelected: {
+    color: '#000', // Contrast against gold
+    fontWeight: '700',
+  },
+  dayStripNumberContainer: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'transparent',
+  },
+  dayStripNumberContainerSelected: {
+    backgroundColor: '#fff', // White circle behind number for extra pop
+  },
+  dayStripNumber: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: theme.text,
+  },
+  dayStripNumberSelected: {
+    color: '#000', // Black number inside white circle inside gold pill
   },
   dayDotOn: {
     width: 6,
     height: 6,
     borderRadius: 3,
-    backgroundColor: palette.success,
+    backgroundColor: theme.success,
     marginTop: 4,
   },
   slotRow: {
@@ -1125,27 +1232,30 @@ const styles = StyleSheet.create({
   },
   slotChip: {
     borderWidth: 1,
-    borderColor: palette.border,
-    backgroundColor: palette.surface,
-    borderRadius: 999,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
+    borderColor: 'transparent',
+    backgroundColor: theme.surfaceHighlight, // Dark Gray
+    borderRadius: 20,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    minWidth: 80,
+    alignItems: 'center',
   },
   slotChipActive: {
-    backgroundColor: palette.primary,
-    borderColor: palette.primary,
+    backgroundColor: theme.primary, // Gold
+    borderColor: theme.primary,
   },
   slotChipText: {
-    color: palette.primary,
-    fontWeight: '900',
-    fontSize: 12,
+    color: theme.muted,
+    fontWeight: '600',
+    fontSize: 14,
   },
   slotChipTextActive: {
-    color: palette.surface,
+    color: '#000', // Black text on Gold
+    fontWeight: '700',
   },
   confirmButton: {
     marginTop: 14,
-    backgroundColor: palette.primary,
+    backgroundColor: theme.primary,
     borderRadius: 16,
     paddingVertical: 14,
     alignItems: 'center',
@@ -1155,7 +1265,7 @@ const styles = StyleSheet.create({
     opacity: 0.55,
   },
   confirmButtonText: {
-    color: palette.surface,
+    color: theme.textInverted || '#fff',
     fontWeight: '900',
     fontSize: 14,
   },

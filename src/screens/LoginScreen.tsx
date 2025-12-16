@@ -18,10 +18,13 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { trpc } from '@/lib/trpc';
 import { useAuthStore } from '@/store/authStore';
+import { useTheme } from '@/theme/ThemeContext';
 import type { AuthLoginOutput } from '@/types/trpc';
-import palette from '@/theme/colors';
 
 const LoginScreen = () => {
+  const { theme } = useTheme();
+  const styles = useMemo(() => createStyles(theme), [theme]);
+
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [passwordVisible, setPasswordVisible] = useState(false);
@@ -100,7 +103,7 @@ const LoginScreen = () => {
               {/* Branding Section */}
               <View style={styles.brandingSection}>
                 <View style={styles.logoCircle}>
-                  <FontAwesome5 name="wine-glass-alt" size={24} color={palette.primary} />
+                  <FontAwesome5 name="wine-glass-alt" size={24} color={theme.primary} />
                 </View>
                 <Text style={styles.brandTitle}>VENSO</Text>
                 <Text style={styles.tagline}>Unlock exclusive events & venues</Text>
@@ -112,12 +115,12 @@ const LoginScreen = () => {
                 <View style={styles.field}>
                   <Text style={styles.label}>Email Address</Text>
                   <View style={styles.inputContainer}>
-                    <Feather name="mail" size={18} color={palette.muted} />
+                    <Feather name="mail" size={18} color={theme.muted} />
                     <TextInput
                       style={styles.input}
                       value={email}
                       placeholder="you@example.com"
-                      placeholderTextColor={'rgba(0,0,0,0.4)'}
+                      placeholderTextColor={theme.muted}
                       autoCapitalize="none"
                       keyboardType="email-address"
                       onChangeText={setEmail}
@@ -129,18 +132,18 @@ const LoginScreen = () => {
                 <View style={styles.field}>
                   <Text style={styles.label}>Password</Text>
                   <View style={styles.inputContainer}>
-                    <Feather name="lock" size={18} color={palette.muted} />
+                    <Feather name="lock" size={18} color={theme.muted} />
                     <TextInput
                       style={styles.input}
                       value={password}
                       placeholder="••••••••"
-                      placeholderTextColor={'rgba(0,0,0,0.4)'}
+                      placeholderTextColor={theme.muted}
                       secureTextEntry={!passwordVisible}
                       onChangeText={setPassword}
                       returnKeyType="done"
                     />
                     <Pressable onPress={() => setPasswordVisible(!passwordVisible)} hitSlop={10}>
-                      <Feather name={passwordVisible ? 'eye-off' : 'eye'} size={18} color={palette.muted} />
+                      <Feather name={passwordVisible ? 'eye-off' : 'eye'} size={18} color={theme.muted} />
                     </Pressable>
                   </View>
                 </View>
@@ -185,7 +188,7 @@ const LoginScreen = () => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (theme: any) => StyleSheet.create({
   backgroundImage: {
     flex: 1,
     width: '100%',
@@ -215,7 +218,7 @@ const styles = StyleSheet.create({
     width: 60,
     height: 60,
     borderRadius: 30,
-    backgroundColor: '#fff',
+    backgroundColor: theme.surface,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 8,
@@ -237,7 +240,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   formCard: {
-    backgroundColor: 'rgba(255,255,255,0.95)', // Nearly opaque white for readability
+    backgroundColor: theme.surface, // Adapts to theme
     borderRadius: 24,
     padding: 24,
     gap: 16,
@@ -246,6 +249,8 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 20,
     elevation: 10,
+    borderWidth: 1,
+    borderColor: theme.border
   },
   field: {
     gap: 8,
@@ -253,30 +258,30 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 12,
     fontWeight: '700',
-    color: palette.primary, // Teal label
+    color: theme.primary,
     textTransform: 'uppercase',
   },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F3F4F6',
+    backgroundColor: theme.surfaceHighlight,
     borderRadius: 12,
     paddingHorizontal: 14,
     height: 50,
     gap: 10,
     borderWidth: 1,
-    borderColor: palette.border,
+    borderColor: theme.border,
   },
   input: {
     flex: 1,
     fontSize: 16,
-    color: palette.text,
+    color: theme.text,
   },
   forgotPassword: {
     alignSelf: 'flex-end',
   },
   forgotPasswordText: {
-    color: palette.muted,
+    color: theme.muted,
     fontSize: 13,
     fontWeight: '600',
   },
@@ -293,13 +298,13 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
   button: {
-    backgroundColor: palette.primary,
+    backgroundColor: theme.primary,
     height: 54,
     borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: 8,
-    shadowColor: palette.primary,
+    shadowColor: theme.primary,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
@@ -320,11 +325,11 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   footerText: {
-    color: palette.muted,
+    color: theme.muted,
     fontSize: 14,
   },
   signUpText: {
-    color: palette.primary,
+    color: theme.primary,
     fontSize: 14,
     fontWeight: '700',
   },

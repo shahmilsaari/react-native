@@ -16,7 +16,8 @@ import { Feather } from '@expo/vector-icons';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import { trpc } from '@/lib/trpc';
-import palette from '@/theme/colors';
+import { useTheme } from '@/theme/ThemeContext';
+import { useDebounce } from '../hooks/useDebounce';
 import type { RootStackParamList } from '@/navigation/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Bookings'>;
@@ -39,18 +40,18 @@ const formatDateTime = (iso?: string) => {
   return date.toLocaleString();
 };
 
-const getStatusStyles = (status?: string) => {
+const getStatusStyles = (status: string | undefined, theme: any) => {
   const normalized = (status ?? '').toLowerCase();
   if (normalized === 'confirmed' || normalized === 'paid' || normalized === 'completed') {
-    return { backgroundColor: '#ECFDF3', textColor: palette.success, borderColor: '#ABEFC6' };
+    return { backgroundColor: '#ECFDF3', textColor: theme.success, borderColor: '#ABEFC6' };
   }
   if (normalized === 'pending' || normalized === 'processing') {
-    return { backgroundColor: '#EFF8FF', textColor: palette.secondary, borderColor: '#B2DDFF' };
+    return { backgroundColor: '#EFF8FF', textColor: theme.secondary, borderColor: '#B2DDFF' };
   }
   if (normalized === 'cancelled' || normalized === 'canceled') {
-    return { backgroundColor: '#F2F4F7', textColor: palette.muted, borderColor: palette.border };
+    return { backgroundColor: '#F2F4F7', textColor: theme.muted, borderColor: theme.border };
   }
-  return { backgroundColor: palette.surface, textColor: palette.primary, borderColor: palette.border };
+  return { backgroundColor: theme.surface, textColor: theme.primary, borderColor: theme.border };
 };
 
 type StatusFilter = 'all' | 'confirmed' | 'pending' | 'cancelled';
@@ -63,8 +64,11 @@ const statusFilters: Array<{ label: string; value: StatusFilter }> = [
 ];
 
 const BookingsScreen = ({ navigation }: Props) => {
+  const { theme } = useTheme();
+  const styles = useMemo(() => createStyles(theme), [theme]);
   const query = trpc.bookings.my.useQuery(undefined, { retry: 1 });
   const [search, setSearch] = useState('');
+  const debouncedSearch = useDebounce(search, 500);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
 
   const bookings = useMemo(() => {
@@ -74,7 +78,7 @@ const BookingsScreen = ({ navigation }: Props) => {
   }, [query.data]);
 
   const filteredBookings = useMemo(() => {
-    const normalizedSearch = search.trim().toLowerCase();
+    const normalizedSearch = debouncedSearch.trim().toLowerCase();
 
     return bookings.filter((item) => {
       const normalizedStatus = (item.status ?? '').toLowerCase();
@@ -99,7 +103,7 @@ const BookingsScreen = ({ navigation }: Props) => {
 
       return haystack.includes(normalizedSearch);
     });
-  }, [bookings, search, statusFilter]);
+  }, [bookings, debouncedSearch, statusFilter]);
 
   const isRefreshing = query.isFetching && !query.isLoading;
 
@@ -107,7 +111,7 @@ const BookingsScreen = ({ navigation }: Props) => {
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       {query.isLoading ? (
         <View style={styles.loadingState}>
-          <ActivityIndicator size="small" color={palette.secondary} />
+          <ActivityIndicator size="small" color={theme.secondary} />
           <Text style={styles.loadingText}>Loading bookings…</Text>
         </View>
       ) : query.isError ? (
@@ -117,7 +121,7 @@ const BookingsScreen = ({ navigation }: Props) => {
             {(query.error as any)?.message ?? 'Please try again.'}
           </Text>
           <Pressable style={styles.retryButton} onPress={() => query.refetch()}>
-            <Feather name="refresh-cw" size={16} color={palette.surface} />
+            <Feather name="refresh-cw" size={16} color={theme.surface} />
             <Text style={styles.retryText}>Retry</Text>
           </Pressable>
         </View>
@@ -125,13 +129,13 @@ const BookingsScreen = ({ navigation }: Props) => {
         <FlatList
           data={filteredBookings}
           keyExtractor={(item) => item.id}
-          refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={() => query.refetch()} />}
+          refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={() => query.refetch()} tintColor={theme.primary} />}
           contentContainerStyle={styles.listContent}
           ListHeaderComponent={
             <View style={styles.headerBlock}>
               <View style={styles.header}>
                 <Pressable style={styles.backButton} onPress={() => navigation.goBack()}>
-                  <Feather name="arrow-left" size={18} color={palette.primary} />
+                  <Feather name="arrow-left" size={18} color={theme.primary} />
                 </Pressable>
                 <View style={styles.headerTitleBlock}>
                   <Text style={styles.title}>Bookings</Text>
@@ -143,14 +147,21 @@ const BookingsScreen = ({ navigation }: Props) => {
                   <View style={styles.countPill}>
                     <Text style={styles.countPillText}>{filteredBookings.length}</Text>
                   </View>
+                  <Pressable
+                    style={styles.calendarButton}
+                    onPress={() => navigation.navigate('MyCalendar')}
+                    hitSlop={10}
+                  >
+                    <Feather name="calendar" size={20} color={theme.primary} />
+                  </Pressable>
                 </View>
               </View>
 
               <View style={styles.searchField}>
-                <Feather name="search" size={18} color={palette.muted} />
+                <Feather name="search" size={18} color={theme.muted} />
                 <TextInput
                   placeholder="Search booking no, service, event…"
-                  placeholderTextColor={palette.muted}
+                  placeholderTextColor={theme.muted}
                   style={styles.searchInput}
                   value={search}
                   onChangeText={setSearch}
@@ -160,8 +171,13 @@ const BookingsScreen = ({ navigation }: Props) => {
                   clearButtonMode="while-editing"
                 />
                 {search.length ? (
-                  <Pressable onPress={() => setSearch('')} hitSlop={10}>
-                    <Feather name="x-circle" size={18} color={palette.muted} />
+                  <Pressable
+                    onPress={() => {
+                      setSearch('');
+                    }}
+                    hitSlop={10}
+                  >
+                    <Feather name="x-circle" size={18} color={theme.muted} />
                   </Pressable>
                 ) : null}
               </View>
@@ -183,7 +199,7 @@ const BookingsScreen = ({ navigation }: Props) => {
             </View>
           }
           renderItem={({ item }) => {
-            const badge = getStatusStyles(item.status);
+            const badge = getStatusStyles(item.status, theme);
             const title = item.service?.name ?? 'Service booking';
             const subtitle = item.event?.name ?? item.vendorCompany?.name ?? item.customerUser?.email ?? '—';
             const coverImage = item.service?.images?.[0];
@@ -198,7 +214,7 @@ const BookingsScreen = ({ navigation }: Props) => {
                       <Image source={{ uri: coverImage }} style={styles.coverImage} />
                     ) : (
                       <View style={styles.coverPlaceholder}>
-                        <Feather name="briefcase" size={18} color={palette.primary} />
+                        <Feather name="briefcase" size={18} color={theme.primary} />
                       </View>
                     )}
                   </View>
@@ -227,13 +243,13 @@ const BookingsScreen = ({ navigation }: Props) => {
 
                     <View style={styles.metaRow}>
                       <View style={styles.metaChip}>
-                        <Feather name="hash" size={13} color={palette.muted} />
+                        <Feather name="hash" size={13} color={theme.muted} />
                         <Text style={styles.metaChipText} numberOfLines={1}>
                           {item.bookingNo ?? item.id}
                         </Text>
                       </View>
                       <View style={styles.metaChip}>
-                        <Feather name="calendar" size={13} color={palette.muted} />
+                        <Feather name="calendar" size={13} color={theme.muted} />
                         <Text style={styles.metaChipText} numberOfLines={1}>
                           {formatDateTime(item.bookingDate)}
                         </Text>
@@ -242,7 +258,7 @@ const BookingsScreen = ({ navigation }: Props) => {
 
                     <View style={styles.cardFooter}>
                       <Text style={styles.detailsHint}>View details</Text>
-                      <Feather name="chevron-right" size={18} color={palette.muted} />
+                      <Feather name="chevron-right" size={18} color={theme.muted} />
                     </View>
                   </View>
                 </View>
@@ -252,7 +268,7 @@ const BookingsScreen = ({ navigation }: Props) => {
           ListEmptyComponent={
             <View style={styles.emptyState}>
               <View style={styles.emptyIcon}>
-                <Feather name="calendar" size={20} color={palette.primary} />
+                <Feather name="calendar" size={20} color={theme.primary} />
               </View>
               <Text style={styles.emptyTitle}>No bookings</Text>
               <Text style={styles.emptyText}>Try clearing search or switching status filters.</Text>
@@ -265,10 +281,10 @@ const BookingsScreen = ({ navigation }: Props) => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (theme: any) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: palette.background,
+    backgroundColor: theme.background,
     paddingHorizontal: 20
   },
   headerBlock: {
@@ -287,8 +303,8 @@ const styles = StyleSheet.create({
     height: 44,
     borderRadius: 22,
     borderWidth: 1,
-    borderColor: palette.border,
-    backgroundColor: palette.surface,
+    borderColor: theme.border,
+    backgroundColor: theme.surface,
     alignItems: 'center',
     justifyContent: 'center'
   },
@@ -299,22 +315,23 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 18,
     fontWeight: '800',
-    color: palette.primary
+    color: theme.primary
   },
   subtitle: {
-    color: palette.muted,
+    color: theme.muted,
     fontSize: 12,
     fontWeight: '700'
   },
   headerRight: {
-    alignItems: 'flex-end',
-    justifyContent: 'center'
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8
   },
   countPill: {
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: palette.border,
-    backgroundColor: '#EEF2FF',
+    borderColor: theme.border,
+    backgroundColor: theme.surfaceHighlight,
     minWidth: 44,
     paddingHorizontal: 12,
     height: 36,
@@ -323,22 +340,32 @@ const styles = StyleSheet.create({
   },
   countPillText: {
     fontWeight: '900',
-    color: palette.primary
+    color: theme.primary
+  },
+  calendarButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: theme.border,
+    backgroundColor: theme.surface,
+    alignItems: 'center',
+    justifyContent: 'center'
   },
   searchField: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
     borderRadius: 18,
-    backgroundColor: palette.surface,
+    backgroundColor: theme.surfaceHighlight, // Better contrast in dark mode
     paddingHorizontal: 14,
     borderWidth: 1,
-    borderColor: palette.border,
+    borderColor: theme.border,
     height: 54
   },
   searchInput: {
     flex: 1,
-    color: palette.text,
+    color: theme.text,
     fontSize: 15
   },
   filters: {
@@ -350,20 +377,20 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: palette.border,
-    backgroundColor: palette.surface
+    borderColor: theme.border,
+    backgroundColor: theme.surface
   },
   filterPillActive: {
-    backgroundColor: palette.primary,
-    borderColor: palette.primary
+    backgroundColor: theme.primary,
+    borderColor: theme.primary
   },
   filterLabel: {
-    color: palette.primary,
+    color: theme.primary,
     fontWeight: '800',
     fontSize: 12
   },
   filterLabelActive: {
-    color: palette.surface
+    color: theme.surface
   },
   listContent: {
     paddingBottom: 22,
@@ -372,8 +399,8 @@ const styles = StyleSheet.create({
   card: {
     borderRadius: 18,
     borderWidth: 1,
-    borderColor: palette.border,
-    backgroundColor: palette.surface,
+    borderColor: theme.border,
+    backgroundColor: theme.surface,
     padding: 14
   },
   cardRow: {
@@ -386,8 +413,8 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: palette.border,
-    backgroundColor: '#FBFBFF'
+    borderColor: theme.border,
+    backgroundColor: theme.surfaceHighlight
   },
   coverImage: {
     width: '100%',
@@ -415,10 +442,10 @@ const styles = StyleSheet.create({
   cardTitle: {
     fontSize: 16,
     fontWeight: '800',
-    color: palette.primary
+    color: theme.primary
   },
   cardSubtitle: {
-    color: palette.muted
+    color: theme.muted
   },
   statusBadge: {
     borderRadius: 999,
@@ -443,13 +470,13 @@ const styles = StyleSheet.create({
     gap: 7,
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: palette.border,
-    backgroundColor: '#FBFBFF',
+    borderColor: theme.border,
+    backgroundColor: theme.surfaceHighlight,
     paddingVertical: 9,
     paddingHorizontal: 12
   },
   metaChipText: {
-    color: palette.text,
+    color: theme.text,
     fontSize: 13,
     flex: 1
   },
@@ -459,11 +486,11 @@ const styles = StyleSheet.create({
     alignItems: 'center'
   },
   detailsHint: {
-    color: palette.muted,
+    color: theme.muted,
     fontWeight: '700'
   },
   emptyText: {
-    color: palette.muted,
+    color: theme.muted,
     lineHeight: 20,
     textAlign: 'center'
   },
@@ -477,14 +504,14 @@ const styles = StyleSheet.create({
     height: 56,
     borderRadius: 18,
     borderWidth: 1,
-    borderColor: palette.border,
-    backgroundColor: palette.surface,
+    borderColor: theme.border,
+    backgroundColor: theme.surface,
     alignItems: 'center',
     justifyContent: 'center'
   },
   emptyTitle: {
     fontWeight: '900',
-    color: palette.primary,
+    color: theme.primary,
     fontSize: 16
   },
   loadingState: {
@@ -493,25 +520,25 @@ const styles = StyleSheet.create({
     gap: 12
   },
   loadingText: {
-    color: palette.muted,
+    color: theme.muted,
     fontWeight: '700'
   },
   errorState: {
     marginTop: 36,
     borderWidth: 1,
-    borderColor: palette.border,
-    backgroundColor: palette.surface,
+    borderColor: theme.border,
+    backgroundColor: theme.surface,
     borderRadius: 20,
     padding: 18,
     gap: 10
   },
   errorTitle: {
     fontWeight: '900',
-    color: palette.primary,
+    color: theme.primary,
     fontSize: 16
   },
   errorMessage: {
-    color: palette.muted,
+    color: theme.muted,
     lineHeight: 20
   },
   retryButton: {
@@ -522,10 +549,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 10,
-    backgroundColor: palette.primary
+    backgroundColor: theme.primary
   },
   retryText: {
-    color: palette.surface,
+    color: theme.surface,
     fontWeight: '900'
   }
 });

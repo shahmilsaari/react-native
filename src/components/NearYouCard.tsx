@@ -1,7 +1,7 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, StyleSheet, Pressable, Image } from 'react-native';
 import { Ionicons, FontAwesome } from '@expo/vector-icons';
-import palette from '@/theme/colors';
+import { useTheme } from '@/theme/ThemeContext';
 import { ServiceListItem } from './ServiceCard';
 
 type Props = {
@@ -10,6 +10,8 @@ type Props = {
 };
 
 const NearYouCard = ({ data, onPress }: Props) => {
+    const { theme } = useTheme();
+    const styles = useMemo(() => createStyles(theme), [theme]);
     const image = data.images?.[0] ?? 'https://images.unsplash.com/photo-1566073771259-6a8506099945?ixlib=rb-4.0.3&auto=format&fit=crop&w=200&q=80';
     const rating = 4.9; // Mock
 
@@ -30,15 +32,15 @@ const NearYouCard = ({ data, onPress }: Props) => {
 
                 <View style={styles.facilitiesRow}>
                     <View style={styles.facilityItem}>
-                        <Ionicons name="people-outline" size={14} color={palette.muted} />
+                        <Ionicons name="people-outline" size={14} color={theme.muted} />
                         <Text style={styles.facilityText}>4 Guests</Text>
                     </View>
                     <View style={styles.facilityItem}>
-                        <Ionicons name="bed-outline" size={14} color={palette.muted} />
+                        <Ionicons name="bed-outline" size={14} color={theme.muted} />
                         <Text style={styles.facilityText}>2 Beds</Text>
                     </View>
                     <View style={styles.facilityItem}>
-                        <Ionicons name="water-outline" size={14} color={palette.muted} />
+                        <Ionicons name="water-outline" size={14} color={theme.muted} />
                         <Text style={styles.facilityText}>2 Baths</Text>
                     </View>
                 </View>
@@ -51,11 +53,11 @@ const NearYouCard = ({ data, onPress }: Props) => {
     );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (theme: any) => StyleSheet.create({
     container: {
         flexDirection: 'row',
         padding: 12,
-        backgroundColor: '#fff',
+        backgroundColor: theme.surface,
         borderRadius: 16,
         marginBottom: 16,
         alignItems: 'center',
@@ -65,12 +67,14 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.05,
         shadowRadius: 8,
         elevation: 2,
+        borderWidth: 1,
+        borderColor: theme.border,
     },
     thumbnail: {
         width: 70,
         height: 70,
         borderRadius: 12,
-        backgroundColor: palette.border,
+        backgroundColor: theme.border,
     },
     content: {
         flex: 1,
@@ -84,7 +88,7 @@ const styles = StyleSheet.create({
     title: {
         fontSize: 16,
         fontWeight: '700',
-        color: palette.text,
+        color: theme.text,
         flex: 1,
         marginRight: 8,
     },
@@ -96,7 +100,7 @@ const styles = StyleSheet.create({
     ratingText: {
         fontSize: 13,
         fontWeight: '600',
-        color: palette.text,
+        color: theme.text,
     },
     facilitiesRow: {
         flexDirection: 'row',
@@ -109,18 +113,12 @@ const styles = StyleSheet.create({
     },
     facilityText: {
         fontSize: 12,
-        color: palette.muted,
+        color: theme.muted,
     },
     favoriteButton: {
         position: 'absolute',
         left: 12 + 6, // 12 padding + some offset
         top: 12 + 6,
-        // Actually the design shows the heart is on the image? 
-        // Wait, near you card in the design (bottom) checks out:
-        // It has a heart on the image? It's hard to see. 
-        // The top popular card has a heart.
-        // The bottom 'Near you' card has a heart on the top left of the image.
-        // Let's position it on the image.
         width: 24,
         height: 24,
         borderRadius: 12,

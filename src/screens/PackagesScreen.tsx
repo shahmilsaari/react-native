@@ -18,8 +18,10 @@ import PopularHotelCard from '@/components/PopularHotelCard';
 import NearYouCard from '@/components/NearYouCard';
 import { ServiceListItem } from '@/components/ServiceCard';
 import { trpc } from '@/lib/trpc';
+import BottomNavBar from '@/components/BottomNavBar';
 import { useAuthStore } from '@/store/authStore';
-import palette from '@/theme/colors';
+import { useTheme } from '@/theme/ThemeContext';
+import { useDebounce } from '../hooks/useDebounce';
 import { RootStackParamList } from '@/navigation/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Packages'>;
@@ -33,16 +35,18 @@ const navItems = [
 ];
 
 const PackagesScreen = ({ navigation }: Props) => {
+  const { theme } = useTheme();
   const servicesQuery = trpc.services.getServices.useQuery(undefined, { retry: 1 });
   const user = useAuthStore((state) => state.user);
 
   const [query, setQuery] = useState('');
+  const debouncedQuery = useDebounce(query, 400); // 400ms delay for snappier performance
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
 
   // Greeting Logic
   const greeting = useMemo(() => {
     // Basic "Hello" as per design, could be dynamic
-    return 'Hello';
+    return 'Hotels & Services'; // Changed greeting for better context
   }, []);
 
   const displayName = useMemo(() => {
@@ -70,23 +74,35 @@ const PackagesScreen = ({ navigation }: Props) => {
   }, [services]);
 
   const filteredServices = useMemo(() => {
-    const normalized = query.trim().toLowerCase();
+    const normalized = debouncedQuery.trim().toLowerCase();
     return services.filter((item) => {
       const matchesCategory = selectedCategory === 'all' ? true : item.category === selectedCategory;
       if (!matchesCategory) return false;
       if (!normalized) return true;
-      const haystack = [item.name, item.serviceDetails, item.vendorCompany, item.category]
+
+      const vc = typeof item.vendorCompany === 'string'
+        ? item.vendorCompany
+        : (item.vendorCompany as any)?.name ?? '';
+
+      const haystack = [
+        item.name,
+        item.serviceDetails,
+        vc,
+        item.category
+      ]
         .filter(Boolean)
         .join(' ')
         .toLowerCase();
       return haystack.includes(normalized);
     });
-  }, [query, selectedCategory, services]);
+  }, [debouncedQuery, selectedCategory, services]);
 
   const popularServices = useMemo(() => {
     // Just take the first 5 for now as "Popular"
     return filteredServices.slice(0, 5);
   }, [filteredServices]);
+
+  const styles = useMemo(() => createStyles(theme), [theme]);
 
   const renderHeader = () => (
     <View style={styles.headerContainer}>
@@ -97,7 +113,7 @@ const PackagesScreen = ({ navigation }: Props) => {
           <Text style={styles.waveEmoji}>👋</Text>
         </View>
         <Pressable style={styles.notificationBtn}>
-          <Feather name="bell" size={20} color={palette.text} />
+          <Feather name="bell" size={20} color={theme.text} />
           <View style={styles.badge}>
             <Text style={styles.badgeText}>3</Text>
           </View>
@@ -108,16 +124,29 @@ const PackagesScreen = ({ navigation }: Props) => {
 
       {/* Search Bar */}
       <View style={styles.searchBar}>
-        <Feather name="search" size={20} color={palette.muted} style={styles.searchIcon} />
+        <Feather name="search" size={20} color={theme.muted} style={styles.searchIcon} />
         <TextInput
           placeholder="Search hotel"
-          placeholderTextColor={palette.muted}
+          placeholderTextColor={theme.muted}
           style={styles.searchInput}
           value={query}
           onChangeText={setQuery}
+          autoCapitalize="none"
+          autoCorrect={false}
+          returnKeyType="search"
+          clearButtonMode="while-editing"
         />
+        {query.length > 0 && (
+          <Pressable
+            onPress={() => setQuery('')}  // Just clear query, debounce will follow
+            hitSlop={10}
+            style={{ marginRight: 8 }}
+          >
+            <Feather name="x-circle" size={18} color={theme.muted} />
+          </Pressable>
+        )}
         <Pressable style={styles.filterBtn}>
-          <Ionicons name="options-outline" size={20} color={palette.text} />
+          <Ionicons name="options-outline" size={20} color={theme.text} />
         </Pressable>
       </View>
 
@@ -204,37 +233,15 @@ const PackagesScreen = ({ navigation }: Props) => {
       />
 
       {/* Bottom Nav */}
-      <View style={styles.bottomNav}>
-        {navItems.map((item, index) => {
-          const isActive = index === 0;
-          return (
-            <Pressable
-              key={item.label}
-              style={[styles.navButton, isActive && styles.navButtonActive]}
-              onPress={() => {
-                if (item.label === 'Profile') {
-                  navigation.navigate('Profile');
-                }
-              }}
-            >
-              <Feather
-                name={item.icon}
-                size={20}
-                color={isActive ? palette.surface : palette.muted}
-              />
-              <Text style={[styles.navLabel, isActive && styles.navLabelActive]}>{item.label}</Text>
-            </Pressable>
-          );
-        })}
-      </View>
+      <BottomNavBar />
     </SafeAreaView>
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (theme: any) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F9FAFB', // Light gray background
+    backgroundColor: theme.background, // Light gray background
   },
   listContent: {
     paddingBottom: 100, // Space for bottom nav
@@ -257,7 +264,7 @@ const styles = StyleSheet.create({
   },
   greetingText: {
     fontSize: 16,
-    color: palette.muted,
+    color: theme.muted,
   },
   waveEmoji: {
     fontSize: 16,
@@ -295,13 +302,13 @@ const styles = StyleSheet.create({
   mainTitle: {
     fontSize: 28,
     fontWeight: '700',
-    color: palette.text,
+    color: theme.text,
     marginBottom: 20,
   },
   searchBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#fff',
+    backgroundColor: theme.surfaceHighlight, // Better contrast in dark mode
     borderRadius: 16,
     paddingHorizontal: 16,
     height: 52,
@@ -310,6 +317,8 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.03,
     shadowRadius: 8,
     elevation: 2,
+    borderWidth: 1,
+    borderColor: theme.border,
   },
   searchIcon: {
     marginRight: 12,
@@ -317,7 +326,7 @@ const styles = StyleSheet.create({
   searchInput: {
     flex: 1,
     fontSize: 16,
-    color: palette.text,
+    color: theme.text,
   },
   filterBtn: {
     padding: 4,
@@ -330,18 +339,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 12,
     borderRadius: 14,
-    backgroundColor: '#fff',
+    backgroundColor: theme.surface,
     borderWidth: 1,
-    borderColor: palette.border,
+    borderColor: theme.border,
   },
   categoryPillActive: {
-    backgroundColor: palette.primary,
-    borderColor: palette.primary,
+    backgroundColor: theme.primary,
+    borderColor: theme.primary,
   },
   categoryText: {
     fontSize: 14,
     fontWeight: '600',
-    color: palette.muted,
+    color: theme.muted,
   },
   categoryTextActive: {
     color: '#fff',
@@ -355,11 +364,11 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 20,
     fontWeight: '700',
-    color: palette.text,
+    color: theme.text,
   },
   seeAllText: {
     fontSize: 14,
-    color: palette.primary,
+    color: theme.primary,
     fontWeight: '600',
   },
   popularScroll: {
@@ -378,39 +387,6 @@ const styles = StyleSheet.create({
   fireEmoji: {
     fontSize: 20,
   },
-  bottomNav: {
-    position: 'absolute',
-    left: 20,
-    right: 20,
-    bottom: 24,
-    backgroundColor: palette.surface,
-    borderRadius: 32,
-    padding: 12,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    shadowColor: '#000',
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 8
-  },
-  navButton: {
-    alignItems: 'center',
-    flex: 1
-  },
-  navButtonActive: {
-    backgroundColor: palette.primary,
-    borderRadius: 24,
-    paddingVertical: 10
-  },
-  navLabel: {
-    fontSize: 12,
-    color: palette.muted,
-    fontWeight: '600',
-    marginTop: 4
-  },
-  navLabelActive: {
-    color: palette.surface
-  }
 });
 
 export default PackagesScreen;
